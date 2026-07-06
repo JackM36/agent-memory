@@ -1,0 +1,6 @@
+description = "Run the read-only memory scout for a task."
+prompt = """
+Follow `.agent-memory/commands/memory-scout.md`.
+
+Arguments: {{args}}
+"""

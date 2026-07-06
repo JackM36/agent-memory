@@ -1,0 +1,1 @@
+- `rules/{{id}}.md` | tags: [] | files: `path/or/glob/**` | priority: medium | updated: {{date}} | One-line routing summary.

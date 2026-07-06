@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"./.agent-memory/hooks/report-nudge.sh\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

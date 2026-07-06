@@ -1,0 +1,6 @@
+description = "Resolve an agent-memory uncertainty with confirmed evidence."
+prompt = """
+Follow `.agent-memory/commands/memory-resolve.md`.
+
+Arguments: {{args}}
+"""

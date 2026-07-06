@@ -1,0 +1,6 @@
+description = "Curate recent notes and reports into durable memory."
+prompt = """
+Follow `.agent-memory/commands/memory-refresh.md`.
+
+Arguments: {{args}}
+"""

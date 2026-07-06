@@ -1,0 +1,10 @@
+name = "memory_maintainer"
+description = "Post-work agent-memory maintainer for reports, memories, rules, uncertainties, and manifest updates."
+sandbox_mode = "workspace-write"
+developer_instructions = """
+Use `.agent-memory/agents/memory-maintainer.md` as your source-of-truth instructions.
+
+Use `.agent-memory/templates/memory-maintenance-result.md` for your result.
+
+Edit only `.agent-memory/` files. Do not edit application code or native integration files.
+"""
