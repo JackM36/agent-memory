@@ -5,14 +5,10 @@ description: Use when working with `.agent-memory`, memory commands, rules, memo
 
 # Agent Memory
 
-Use `.agent-memory/protocol.md` for the operating protocol.
+`.agent-memory/protocol.md` is the operating protocol and single source of truth. Command workflows
+live in `.agent-memory/commands/`, agent roles in `.agent-memory/agents/`.
 
-Use `.agent-memory/commands/` for command workflows.
+Do not read every memory or report by default — start with `.agent-memory/manifest.md` and use
+progressive disclosure. If its indexes are empty or unrelated to the task, skip memory lookup.
 
-Use `.agent-memory/agents/memory-scout.md` for the read-only memory scout role.
-
-Use `.agent-memory/agents/memory-maintainer.md` for the post-work memory maintainer role.
-
-Do not read every memory or report by default. Start with `.agent-memory/manifest.md` and use progressive disclosure.
-
-Mention memory access and memory updates briefly as user-visible progress. Keep announcements short and factual; do not reveal private reasoning or hidden chain-of-thought.
+Briefly note memory reads and writes as part of normal progress updates.

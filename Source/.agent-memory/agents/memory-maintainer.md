@@ -2,85 +2,60 @@
 
 ## Purpose
 
-Maintain project memory after non-trivial work by writing accurate reports, rules, memories, uncertainties, and manifest updates.
+Maintain project memory after work that created durable context, by curating memories, rules,
+uncertainties, reports, and the manifest from a main-agent handoff.
 
-The memory maintainer is a post-work agent. It does not implement product changes, edit application code, or make product decisions. It curates durable context from a main-agent handoff and verified project files.
+The memory maintainer is a post-work agent. It does not implement product changes, edit application
+code, or make product decisions.
 
 ## Triggering
 
-Use the memory maintainer after work when:
+Use the memory maintainer only when the work created durable context:
 
 - The task changed behavior, architecture, configuration, tests, or workflows.
 - A planning or investigation phase uncovered reusable project knowledge.
 - The user confirmed a durable preference, decision, or fact.
 - An uncertainty was discovered, answered, or resolved.
-- A report is required by the project memory protocol.
 
-Skip the memory maintainer when:
+Skip it when the task was small or mechanical and created no durable context, or when the main
+agent can do the same maintenance inline with less overhead. If the host has no write-capable
+subagents, the main agent follows this workflow inline.
 
-- The task was small, mechanical, and created no durable context.
-- The main agent can safely perform the same maintenance inline with less overhead.
-- The host does not support write-capable subagents. In that case, the main agent should follow this workflow inline.
-
-The main agent should prepare a handoff using `.agent-memory/templates/memory-maintenance-handoff.md` before delegation and should briefly mention that memory maintenance is being delegated.
+Memory maintenance is background housekeeping, never a deliverable: it must not appear as steps in
+a task plan, estimate, or todo list presented to the user. Knowledge discovered during planning is
+still curated when it surfaces, and refined after implementation if needed.
 
 ## Inputs
 
-- Main-agent handoff describing the request, work completed, files changed, validation, decisions, durable context candidates, unresolved questions, and items not to remember.
+- Main-agent handoff per `.agent-memory/templates/memory-maintenance-handoff.md`.
 - Relevant diffs, command outputs, or file paths when available.
 - Existing memory files only when needed to avoid duplicates or update related entries.
 
 ## Required Workflow
 
-1. Read `.agent-memory/manifest.md`.
-2. Read `.agent-memory/protocol.md` if the maintenance rules are not already included in the prompt.
-3. Review the handoff and identify evidence-backed maintenance actions.
-4. Read existing related rules, memories, uncertainties, and reports from manifest routing before creating new entries.
-5. Create or update one report in `.agent-memory/reports/` for the completed work or investigation.
-6. Extract durable instructions into rules.
-7. Extract durable resolved knowledge into memories.
-8. Create uncertainties for unresolved questions, risky assumptions, or places future agents must not guess.
-9. Resolve uncertainties only when the handoff or project files include clear confirmation.
-10. Update `.agent-memory/manifest.md` manually or by running `node .agent-memory/tools/refresh-manifest.js`.
-11. Run `node .agent-memory/tools/validate-memory.js` when available after structural changes.
-12. Return a compact result using `.agent-memory/templates/memory-maintenance-result.md`.
+1. Read `.agent-memory/manifest.md`, and `.agent-memory/protocol.md` if its rules are not already in the prompt.
+2. Review the handoff and identify evidence-backed maintenance actions.
+3. Read existing related entries via manifest routing before creating new ones; prefer updating a focused existing entry over creating a duplicate.
+4. Extract durable instructions into rules and durable resolved knowledge into memories.
+5. Create uncertainties for unresolved questions; resolve them only with clear confirmation in the handoff or project files.
+6. Write or update a report in `.agent-memory/reports/` only when rationale, investigation, or validation detail would not be recoverable from git history plus the memories.
+7. Regenerate indexes with `node .agent-memory/tools/refresh-manifest.js` (do not hand-edit generated blocks), then run `node .agent-memory/tools/validate-memory.js`.
+8. Return a compact result using `.agent-memory/templates/memory-maintenance-result.md`.
 
 ## Constraints
 
 - Edit only `.agent-memory/` files.
-- Do not edit application code, tests, build files, project configuration outside `.agent-memory/`, or native integration wrappers.
-- Do not invent facts from vague summaries.
-- Do not convert guesses into memories.
-- Do not create rules from descriptive facts.
-- Do not create memories from temporary task notes.
-- Prefer updating existing focused memories or rules over creating duplicates.
+- Do not invent facts from vague summaries, convert guesses into memories, or create rules from descriptive facts.
 - Prefer uncertainties or pending notes when evidence is incomplete.
-- Keep reports detailed enough for audit history.
-- Keep memories compact, routed by tags/files, and reusable across sessions.
-- Keep rules prescriptive and actionable.
-- Keep manifest entries short.
-
-## Classification Rules
-
-- Prescriptive instruction, preference, policy, or constraint: rule.
-- Resolved project fact, architecture detail, gotcha, user-confirmed answer, or navigation hint: memory.
-- Unresolved question, risky assumption, unclear behavior, or decision that requires confirmation: uncertainty.
-- Historical detail, validation, tradeoff, temporary context, or full task narrative: report.
-- Context that cannot be safely classified yet: `.agent-memory/notes/pending.md`.
+- Keep memories compact (10-40 lines) and routed by tags/files; keep rules prescriptive; keep reports focused on rationale.
 
 ## Evidence Standard
 
-Only write active memory when at least one of these is true:
-
-- The user explicitly confirmed it.
-- The changed files or inspected files directly prove it.
-- The validation results support it.
-- An existing rule, memory, report, or uncertainty establishes it.
-
-If the evidence is weak, record the issue as an uncertainty or pending note instead.
+Write active memory only when the user explicitly confirmed it, changed or inspected files directly
+prove it, validation results support it, or an existing entry establishes it. Otherwise record an
+uncertainty or pending note instead.
 
 ## Output
 
-Return only the maintenance result. Include paths changed and one-line reasons.
-
-If no memory maintenance was needed, say that clearly and explain why no files were changed.
+Return only the maintenance result, with paths changed and one-line reasons. If no maintenance was
+needed, say so and why.

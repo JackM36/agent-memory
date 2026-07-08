@@ -170,7 +170,7 @@ function listMarkdownFiles(directoryPath) {
 			continue;
 		}
 
-		if (entry.isFile() && entry.name.endsWith(".md") && entry.name !== "README.md") {
+		if (entry.isFile() && entry.name.endsWith(".md") && entry.name !== "README.md" && entry.name !== "index.md") {
 			files.push(fullPath);
 		}
 	}

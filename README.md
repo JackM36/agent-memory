@@ -38,10 +38,11 @@ Codex custom slash-command files are not included because current Codex docs des
 ### Stop-hook enforcement
 
 The scaffold ships a shared Stop-hook script at `.agent-memory/hooks/report-nudge.sh`. When a session
-changes project files but writes no report to `.agent-memory/reports/`, the hook nudges the agent once
+edits project files but writes no report to `.agent-memory/reports/`, the hook nudges the agent once
 to write one (it explicitly allows skipping small/trivial edits). When the `claude` and/or `codex`
-integrations are installed, the installer wires this hook into `.claude/settings.local.json` and
-`.codex/hooks.json` — merging into an existing file (preserving other keys) or creating it if absent.
+integrations are installed, the installer wires this hook into `.claude/settings.json` (the
+project-shared settings file, so the hook travels with the repo) and `.codex/hooks.json` — merging
+into an existing file (preserving other keys) or creating it if absent.
 Pass `--no-hooks` to skip wiring. OpenCode and Gemini have no equivalent pre-stop hook, so they get
 the workflow wording via `AGENTS.md` only.
 
@@ -112,7 +113,7 @@ Installer behavior:
 - Adds or updates a managed Project Memory section in `AGENTS.md`.
 - Creates `AGENTS.md` if it does not exist.
 - Adds or updates a managed `CLAUDE.md` reference by default.
-- Wires the Stop hook into `.claude/settings.local.json` / `.codex/hooks.json` for the selected
+- Wires the Stop hook into `.claude/settings.json` / `.codex/hooks.json` for the selected
   integrations (idempotent, preserves other keys). Pass `--no-hooks` to skip.
 - Refuses to overwrite changed target files unless `--force` is passed.
 
@@ -132,18 +133,13 @@ This creates or updates the managed Project Memory section in `AGENTS.md`. If `A
 
 ## How Agents Use It
 
-Installed projects get an `AGENTS.md` section that tells agents to:
-
-1. Read `.agent-memory/manifest.md` for behavior-changing, unfamiliar, file/path-driven, historical, or decision-sensitive work.
-2. Read always-read rules.
-3. Use the `memory-scout` workflow or subagent for unfamiliar or memory-heavy context lookup when available.
-4. Read only relevant rules, memories, and uncertainties.
-5. Avoid reports unless deeper history is needed.
-6. Prepare a compact handoff after non-trivial work.
-7. Use the `memory-maintainer` workflow or subagent for post-work reports, memories, rules, uncertainties, and manifest updates when available.
-8. Review the maintainer result before the final response.
-
-Agents are also instructed to mention memory access and memory updates briefly as user-visible progress. These announcements should be short and factual, and should not expose private reasoning or hidden chain-of-thought.
+Installed projects get a compact `AGENTS.md` section that points to `.agent-memory/protocol.md`,
+the single source of truth for the workflow. In short: agents route through the manifest (skipping
+lookup entirely when it is empty or unrelated to the task), read only relevant rules, memories, and
+uncertainties, and after work that created durable context they curate memories/rules and
+regenerate the manifest — delegating to the `memory-scout` and `memory-maintainer` subagents when
+that is proportionate. Memory upkeep is background housekeeping; it never appears as steps in task
+plans presented to the user.
 
 The key idea:
 
@@ -234,7 +230,7 @@ node .agent-memory/tools/uninstall-project-memory.js --mode keep-data
 
 Modes:
 
-- `keep-data` removes agent instruction sections, native wrappers, the Stop-hook entries from `.claude/settings.local.json` / `.codex/hooks.json` (leaving other keys intact and deleting a config file only if it becomes empty), and memory-system scaffold files, but keeps project-created data in `.agent-memory/rules/`, `.agent-memory/memories/`, `.agent-memory/uncertainties/`, `.agent-memory/reports/`, `.agent-memory/notes/`, and `.agent-memory/archive/`.
+- `keep-data` removes agent instruction sections, native wrappers, the Stop-hook entries from `.claude/settings.json` / `.codex/hooks.json` (plus legacy `.claude/settings.local.json` entries; other keys stay intact and a config file is deleted only if it becomes empty), and memory-system scaffold files, but keeps project-created data in `.agent-memory/rules/`, `.agent-memory/memories/`, `.agent-memory/uncertainties/`, `.agent-memory/reports/`, `.agent-memory/notes/`, and `.agent-memory/archive/`.
 - `delete-all` removes agent instruction sections, native wrappers, the Stop-hook config entries, and the entire `.agent-memory/` folder.
 
 Delete everything:

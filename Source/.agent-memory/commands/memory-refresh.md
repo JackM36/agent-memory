@@ -10,7 +10,7 @@ Curate recent memory-system inputs into durable rules, memories, uncertainties, 
 4. Extract durable resolved knowledge into memories.
 5. Convert unresolved or risky questions into uncertainties.
 6. Archive stale, duplicate, or superseded entries.
-7. Update `.agent-memory/manifest.md` manually or with `node .agent-memory/tools/refresh-manifest.js`.
+7. Run `node .agent-memory/tools/refresh-manifest.js`.
 8. Create a refresh report if meaningful context changed.
 
 ## Lesson Handling

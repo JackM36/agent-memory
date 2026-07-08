@@ -1,8 +1,10 @@
 # Agent Memory Manifest
 
-Read this before behavior-changing, unfamiliar, file/path-driven, historical, or decision-sensitive work. Use it as a router, not full context.
+Read this before behavior-changing, unfamiliar, file/path-driven, historical, or decision-sensitive
+work. Use it as a router, not full context. If the indexes below are empty or contain nothing
+related to the task, skip memory lookup and start working.
 
-Detailed protocol: `protocol.md`. Reports are not default context.
+Detailed protocol: `protocol.md`.
 
 ## Always-Read Rules
 
@@ -54,22 +56,12 @@ No unresolved uncertainties yet.
 
 <!-- END UNCERTAINTY INDEX -->
 
-## Reports Index
+## Reports
 
-Reports are not default context. Read only when memory is insufficient or historical reasoning is required.
-
-<!-- BEGIN REPORT INDEX -->
-
-No reports yet.
-
-<!-- END REPORT INDEX -->
+Reports are not default context. History is indexed in `reports/index.md` (generated); read a
+report only when memory is insufficient or historical rationale is required.
 
 ## Maintenance Notes
 
 - Last memory refresh: never
 - Suggested cleanup: none
-
-## Size Targets
-
-- Manifest target: under 200 lines.
-- If larger, split into domain indexes and keep this manifest as the router.

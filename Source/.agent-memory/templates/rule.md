@@ -1,6 +1,4 @@
 ---
-id: {{id}}
-type: rule
 tags: []
 files: []
 summary: One-line routing summary.
@@ -14,7 +12,7 @@ status: active
 
 ## Rule
 
-State the rule clearly.
+State the rule clearly and prescriptively. Keep the file to 10-40 lines; delete unused sections.
 
 ## Applies When
 

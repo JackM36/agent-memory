@@ -13,5 +13,5 @@ If an uncertainty is relevant to the current task and marked `blocking: true`, t
 1. User answers the question.
 2. Agent creates or updates a memory with the confirmed answer.
 3. Agent moves the uncertainty to `.agent-memory/archive/resolved-uncertainties/` or marks it archived.
-4. Agent updates `.agent-memory/manifest.md`.
-5. Agent records the resolution in the task report.
+4. Agent runs `node .agent-memory/tools/refresh-manifest.js`.
+5. Agent records the resolution in the task report, if one exists.

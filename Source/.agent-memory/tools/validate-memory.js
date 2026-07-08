@@ -29,7 +29,6 @@ function validateRequiredPaths(projectRoot, memoryRoot, errors) {
 		"manifest.md",
 		"protocol.md",
 		"commands.md",
-		"config.md",
 		"agents/README.md",
 		"agents/memory-scout.md",
 		"agents/memory-maintainer.md",
@@ -47,6 +46,7 @@ function validateRequiredPaths(projectRoot, memoryRoot, errors) {
 		"memories/README.md",
 		"uncertainties/README.md",
 		"reports/README.md",
+		"reports/index.md",
 		"notes/README.md",
 		"notes/pending.md",
 		"archive/README.md",
@@ -60,10 +60,6 @@ function validateRequiredPaths(projectRoot, memoryRoot, errors) {
 		"templates/memory-maintenance-handoff.md",
 		"templates/memory-maintenance-result.md",
 		"templates/agents-section.md",
-		"templates/manifest-rule-entry.md",
-		"templates/manifest-memory-entry.md",
-		"templates/manifest-uncertainty-entry.md",
-		"templates/manifest-report-entry.md",
 		"tools/memory-tool-utils.js",
 		"tools/validate-memory.js",
 		"tools/init-project-memory.js",
@@ -171,8 +167,7 @@ function validateManifest(projectRoot, memoryRoot, errors) {
 		"RULE INDEX",
 		"ALWAYS READ MEMORY INDEX",
 		"MEMORY INDEX",
-		"UNCERTAINTY INDEX",
-		"REPORT INDEX"
+		"UNCERTAINTY INDEX"
 	];
 
 	for (var i = 0; i < markerNames.length; i++) {
@@ -187,6 +182,16 @@ function validateManifest(projectRoot, memoryRoot, errors) {
 	}
 
 	validateManifestPaths(projectRoot, manifest, errors);
+
+	var reportIndexPath = path.join(memoryRoot, "reports", "index.md");
+	if (fs.existsSync(reportIndexPath)) {
+		var reportIndex = tools.readText(reportIndexPath);
+		if (reportIndex.indexOf("<!-- BEGIN REPORT INDEX -->") < 0 || reportIndex.indexOf("<!-- END REPORT INDEX -->") < 0) {
+			errors.push("reports/index.md is missing managed marker block: REPORT INDEX");
+		}
+
+		validateManifestPaths(projectRoot, reportIndex, errors);
+	}
 }
 
 function validateManifestPaths(projectRoot, manifest, errors) {
@@ -215,10 +220,11 @@ function validateManifestPaths(projectRoot, manifest, errors) {
 }
 
 function validateFrontmatter(projectRoot, memoryRoot, errors) {
-	validateDirectory(projectRoot, path.join(memoryRoot, "rules"), "rule", ["id", "type", "tags", "files", "summary", "always_read", "priority", "updated", "status"], errors);
-	validateDirectory(projectRoot, path.join(memoryRoot, "memories"), "memory", ["id", "type", "tags", "files", "summary", "updated", "last_verified", "verified_by", "confidence", "status"], errors);
-	validateDirectory(projectRoot, path.join(memoryRoot, "uncertainties"), "uncertainty", ["id", "type", "tags", "files", "summary", "blocking", "created", "status"], errors);
-	validateDirectory(projectRoot, path.join(memoryRoot, "reports"), "report", ["id", "type", "date", "agent", "task", "tags", "files_changed", "memory_updates", "uncertainties_created", "uncertainties_resolved", "read_when"], errors);
+	// The entry type is implied by its directory and the id by its filename — neither is frontmatter.
+	validateDirectory(projectRoot, path.join(memoryRoot, "rules"), "rule", ["tags", "files", "summary", "always_read", "priority", "updated", "status"], errors);
+	validateDirectory(projectRoot, path.join(memoryRoot, "memories"), "memory", ["tags", "files", "summary", "updated", "confidence", "status"], errors);
+	validateDirectory(projectRoot, path.join(memoryRoot, "uncertainties"), "uncertainty", ["tags", "files", "summary", "blocking", "created", "status"], errors);
+	validateDirectory(projectRoot, path.join(memoryRoot, "reports"), "report", ["date", "task", "tags", "files_changed", "read_when"], errors);
 }
 
 function validateDirectory(projectRoot, directoryPath, expectedType, requiredFields, errors) {
@@ -236,7 +242,8 @@ function validateDirectory(projectRoot, directoryPath, expectedType, requiredFie
 
 		validateRequiredFields(projectPath, frontmatter, requiredFields, errors);
 
-		if (frontmatter.type !== expectedType) {
+		// `type` is optional (legacy files may still carry it) but must match the directory when present.
+		if (frontmatter.type !== undefined && frontmatter.type !== expectedType) {
 			errors.push(projectPath + " has type `" + frontmatter.type + "`; expected `" + expectedType + "`.");
 		}
 
@@ -265,8 +272,12 @@ function validateAllowedValues(projectPath, frontmatter, expectedType, errors) {
 
 	if (expectedType === "memory") {
 		validateOneOf(projectPath, "confidence", frontmatter.confidence, ["high", "medium", "low"], errors);
-		validateOneOf(projectPath, "verified_by", frontmatter.verified_by, ["code", "user", "tests", "repeated-use", "report", "unverified"], errors);
 		validateOneOf(projectPath, "status", frontmatter.status, ["active", "stale", "superseded", "archived"], errors);
+
+		// last_verified / verified_by are optional; validate the value only when supplied.
+		if (frontmatter.verified_by !== undefined) {
+			validateOneOf(projectPath, "verified_by", frontmatter.verified_by, ["code", "user", "tests", "repeated-use", "report", "unverified"], errors);
+		}
 	}
 
 	if (expectedType === "uncertainty") {

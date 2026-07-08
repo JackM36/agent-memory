@@ -15,7 +15,6 @@ Use these files as the source of truth when creating new entries. Folder README 
 - `memory-maintenance-handoff.md` defines the main-agent handoff for post-work maintenance.
 - `memory-maintenance-result.md` defines memory maintainer output.
 - `agents-section.md` contains the section to add to a project's `AGENTS.md`.
-- `manifest-rule-entry.md` creates manual rule index entries.
-- `manifest-memory-entry.md` creates manual memory index entries.
-- `manifest-uncertainty-entry.md` creates manual uncertainty index entries.
-- `manifest-report-entry.md` creates manual report index entries.
+
+Manifest and report index entries are generated — run `node .agent-memory/tools/refresh-manifest.js`
+instead of editing index blocks by hand.

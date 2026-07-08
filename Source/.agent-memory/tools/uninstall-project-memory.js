@@ -4,6 +4,7 @@ const initProjectMemory = require("./init-project-memory");
 const hookConfig = require("./hook-config");
 const tools = require("./memory-tool-utils");
 
+// config.md no longer ships with the scaffold but stays listed so legacy installs get cleaned up.
 const systemPaths = [
 	"README.md",
 	"manifest.md",
@@ -32,32 +33,39 @@ const wrapperPaths = [
 	".claude/commands/memory-query.md",
 	".claude/commands/memory-file-history.md",
 	".claude/commands/memory-refresh.md",
+	".claude/commands/memory-maintain.md",
 	".claude/commands/memory-prune.md",
 	".claude/commands/memory-resolve.md",
 	".claude/commands/memory-scout.md",
 	".claude/agents/memory-scout.md",
+	".claude/agents/memory-maintainer.md",
 	".claude/skills/agent-memory",
 	".opencode/command/memory-add.md",
 	".opencode/command/memory-init.md",
 	".opencode/command/memory-query.md",
 	".opencode/command/memory-file-history.md",
 	".opencode/command/memory-refresh.md",
+	".opencode/command/memory-maintain.md",
 	".opencode/command/memory-prune.md",
 	".opencode/command/memory-resolve.md",
 	".opencode/command/memory-scout.md",
 	".opencode/agent/memory-scout.md",
+	".opencode/agent/memory-maintainer.md",
 	".opencode/skills/agent-memory",
 	".agents/skills/agent-memory",
 	".codex/agents/memory-scout.toml",
+	".codex/agents/memory-maintainer.toml",
 	".gemini/commands/memory-add.toml",
 	".gemini/commands/memory-init.toml",
 	".gemini/commands/memory-query.toml",
 	".gemini/commands/memory-file-history.toml",
 	".gemini/commands/memory-refresh.toml",
+	".gemini/commands/memory-maintain.toml",
 	".gemini/commands/memory-prune.toml",
 	".gemini/commands/memory-resolve.toml",
 	".gemini/commands/memory-scout.toml",
-	".gemini/agents/memory-scout.md"
+	".gemini/agents/memory-scout.md",
+	".gemini/agents/memory-maintainer.md"
 ];
 
 function main() {

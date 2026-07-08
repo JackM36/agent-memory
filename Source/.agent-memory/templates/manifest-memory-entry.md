@@ -1,1 +1,0 @@
-- `memories/{{id}}.md` | tags: [] | files: `path/or/glob/**` | confidence: medium | updated: {{date}} | One-line routing summary.

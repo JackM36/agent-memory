@@ -16,20 +16,14 @@ Use `.agent-memory/templates/memory.md` when creating a memory.
 - Do not include uncertain information unless explicitly marked.
 - If something is unresolved, create an uncertainty instead.
 - Include evidence for important claims: source files, user confirmation, tests, or related reports.
-- Keep `last_verified` and `verified_by` current when checking or updating a memory.
-- Include code entry points, key symbols, relevant collaborators, and useful searches when they reduce future codebase scanning.
+- Include code entry points, key symbols, and useful searches when they reduce future codebase scanning.
 - Do not turn memories into full code listings or broad implementation history.
-- Target 50-150 lines. Split around 250 lines.
+- Target 10-40 lines. Split around 80 lines.
 
 ## Verification
 
-Allowed `verified_by` values:
-
-- `code`
-- `user`
-- `tests`
-- `repeated-use`
-- `report`
-- `unverified`
+`last_verified` and `verified_by` are optional frontmatter — add them when verification matters and
+keep them current when updating. Allowed `verified_by` values: `code`, `user`, `tests`,
+`repeated-use`, `report`, `unverified`.
 
 Use `confidence: low` for unverified memories that are still worth preserving as leads. Create an uncertainty instead when acting on the information would be risky.

@@ -8,10 +8,12 @@ const scriptMarker = "report-nudge.sh";
 const scriptRelativePath = ".agent-memory/hooks/report-nudge.sh";
 const fragmentsRelativeDir = ".agent-memory/hooks/fragments";
 
-// Which config file and fragment each agent integration wires up.
+// Which config file and fragment each agent integration wires up. Claude uses the project-shared
+// settings.json (settings.local.json is personal and gitignored, so the hook would not travel with
+// the repo); legacyFiles are older install locations that uninstall still cleans up.
 const targets = {
-	claude: { file: ".claude/settings.local.json", fragment: "claude-settings.hooks.json" },
-	codex: { file: ".codex/hooks.json", fragment: "codex-hooks.json" }
+	claude: { file: ".claude/settings.json", fragment: "claude-settings.hooks.json", legacyFiles: [".claude/settings.local.json"] },
+	codex: { file: ".codex/hooks.json", fragment: "codex-hooks.json", legacyFiles: [] }
 };
 
 function readJson(filePath) {
@@ -123,10 +125,17 @@ function installHooks(projectRoot, agents) {
 function uninstallHooks(projectRoot) {
 	var messages = [];
 	var keys = Object.keys(targets);
+	var files = [];
 
 	for (var i = 0; i < keys.length; i++) {
 		var target = targets[keys[i]];
-		var filePath = path.join(projectRoot, target.file);
+		files.push(target.file);
+		files = files.concat(target.legacyFiles || []);
+	}
+
+	for (var f = 0; f < files.length; f++) {
+		var relativePath = files[f];
+		var filePath = path.join(projectRoot, relativePath);
 
 		if (!fs.existsSync(filePath)) {
 			continue;
@@ -136,7 +145,7 @@ function uninstallHooks(projectRoot) {
 		try {
 			config = readJson(filePath);
 		} catch (error) {
-			messages.push("Skipped " + target.file + " (not valid JSON; left untouched).");
+			messages.push("Skipped " + relativePath + " (not valid JSON; left untouched).");
 			continue;
 		}
 
@@ -168,12 +177,12 @@ function uninstallHooks(projectRoot) {
 
 		if (Object.keys(config).length === 0) {
 			fs.unlinkSync(filePath);
-			messages.push(target.file + ": removed Stop hook and deleted now-empty file.");
+			messages.push(relativePath + ": removed Stop hook and deleted now-empty file.");
 			continue;
 		}
 
 		writeJson(filePath, config);
-		messages.push(target.file + ": removed Stop hook.");
+		messages.push(relativePath + ": removed Stop hook.");
 	}
 
 	return messages;

@@ -8,8 +8,7 @@ Find the smallest relevant memory context for a topic.
 2. Start with compact manifest entries.
 3. List candidate rules, memories, uncertainties, and reports with one-line reasons.
 4. Read only selected rules and memories needed to answer the query.
-5. Read reports only if the user asks for deeper history or selected memories are insufficient.
-6. Respect token budgets in `.agent-memory/config.md`.
+5. Read reports (via `reports/index.md`) only if the user asks for deeper history or selected memories are insufficient.
 
 ## Output
 

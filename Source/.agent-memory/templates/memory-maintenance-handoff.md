@@ -1,44 +1,33 @@
 # Memory Maintenance Handoff
 
-## User Request
+Keep this compact — only what the maintainer cannot reconstruct from the files themselves.
 
-- What the user asked for.
+## Request And Outcome
 
-## Work Completed
-
-- What was implemented, investigated, planned, or decided.
+- What the user asked for and what was done, in one to three lines.
 
 ## Files Changed
 
-- `path/to/file` - what changed and why.
+- `path/to/file` - what changed and why (only the non-obvious ones).
 
-## Validation
-
-- Commands run and outcomes.
-- Manual checks performed.
-- Not tested and why.
-
-## Important Decisions
+## Decisions And User-Confirmed Context
 
 - Decisions made during the work and their rationale.
-
-## User-Confirmed Context
-
-- Durable facts, preferences, or decisions explicitly confirmed by the user.
+- Durable facts, preferences, or answers the user explicitly confirmed.
 
 ## Durable Context Candidates
 
-- Facts, gotchas, navigation hints, or conventions that may deserve memory updates.
-- Instructions or preferences that may deserve rule updates.
+- Facts, gotchas, or navigation hints that may deserve memories.
+- Instructions or preferences that may deserve rules.
 
 ## Unresolved Questions
 
-- Questions, risks, or assumptions future agents should not guess about.
+- Questions, risks, or assumptions future agents must not guess about.
 
-## Things Not To Remember
+## Do Not Remember
 
-- Temporary details, one-off choices, or context that should stay out of durable memory.
+- Temporary details or one-off choices that should stay out of durable memory.
 
-## Existing Memory References
+## Validation
 
-- Related rules, memories, uncertainties, or reports already known to the main agent.
+- Commands run and outcomes; what was not tested and why.

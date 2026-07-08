@@ -10,13 +10,12 @@ Provide a completed handoff using `.agent-memory/templates/memory-maintenance-ha
 
 1. Prefer delegating to a write-capable `memory-maintainer` subagent when the host supports it.
 2. If delegation is unavailable, follow `.agent-memory/agents/memory-maintainer.md` inline.
-3. Create or update the task report.
-4. Curate durable instructions into rules.
-5. Curate durable resolved knowledge into memories.
-6. Create or resolve uncertainties as evidence allows.
-7. Update `.agent-memory/manifest.md` manually or with `node .agent-memory/tools/refresh-manifest.js`.
-8. Run `node .agent-memory/tools/validate-memory.js` when available.
-9. Return the result using `.agent-memory/templates/memory-maintenance-result.md`.
+3. Curate durable instructions into rules and durable resolved knowledge into memories.
+4. Create or resolve uncertainties as evidence allows.
+5. Create or update a report only when rationale is not recoverable from git plus the memories.
+6. Run `node .agent-memory/tools/refresh-manifest.js`.
+7. Run `node .agent-memory/tools/validate-memory.js` when available.
+8. Return the result using `.agent-memory/templates/memory-maintenance-result.md`.
 
 ## Constraints
 
