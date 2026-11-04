@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>brain</AssemblyName>
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/AgentBrain.Composition/AgentBrain.Composition.csproj" />
+    <ProjectReference Include="../../src/AgentBrain.Contracts/AgentBrain.Contracts.csproj" />
+    <ProjectReference Include="../../src/AgentBrain.Mcp/AgentBrain.Mcp.csproj" />
+    <ProjectReference Include="../../src/AgentBrain.Integrations/AgentBrain.Integrations.csproj" />
+    <ProjectReference Include="../../src/AgentBrain.Infrastructure.Local/AgentBrain.Infrastructure.Local.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,141 @@
+{
+  "$comment": "Cross-technology, technology-specific, same-project and cross-project cases (spec §15.1). Contexts are defined in contexts.json.",
+  "cases": [
+    {
+      "id": "general-from-unity",
+      "categories": ["general-cross-technology"],
+      "query": "avoid deeply nested if statements by returning early",
+      "context": "space-game",
+      "expect": { "relevant": ["general.engineering/guard-clauses"], "irrelevant": ["web.kb/react-effect-deps"] },
+      "notes": "General clean-code guidance must be usable from a Unity project."
+    },
+    {
+      "id": "general-from-web",
+      "categories": ["general-cross-technology"],
+      "query": "avoid deeply nested if statements by returning early",
+      "context": "web-shop",
+      "expect": { "relevant": ["general.engineering/guard-clauses"], "irrelevant": ["unity.kb/avoid-find-in-update"] },
+      "notes": "Same query from a web project: general knowledge must still qualify."
+    },
+    {
+      "id": "general-naming",
+      "categories": ["general-cross-technology", "paraphrase"],
+      "query": "how to pick clear variable names",
+      "context": "web-shop",
+      "expect": { "relevant": ["general.engineering/naming-intent"] },
+      "notes": "Paraphrase: 'variable names' vs 'name things by intent'."
+    },
+    {
+      "id": "unity-polymorphic-lists",
+      "categories": ["technology-specific", "paraphrase"],
+      "query": "list of derived classes loses its subclass type after entering play mode",
+      "context": "space-game",
+      "expect": { "relevant": ["unity.kb/serialize-reference"], "irrelevant": ["web.kb/validate-boundaries", "web-shop.memory/product-feed-csv"] },
+      "notes": "Unity-only knowledge reached without using the attribute name."
+    },
+    {
+      "id": "web-stale-effect",
+      "categories": ["technology-specific"],
+      "query": "useEffect sees stale state value",
+      "context": "web-shop",
+      "expect": { "relevant": ["web.kb/react-effect-deps"], "irrelevant": ["unity.kb/awaitable-async"] }
+    },
+    {
+      "id": "web-search-as-you-type",
+      "categories": ["technology-specific", "paraphrase"],
+      "query": "older search response overwrites the newer one while typing",
+      "context": "web-shop",
+      "expect": { "relevant": ["web.kb/fetch-abort"] }
+    },
+    {
+      "id": "explicit-other-technology",
+      "categories": ["technology-specific"],
+      "query": "react useEffect dependency array rules",
+      "context": "space-game",
+      "expect": { "relevant": ["web.kb/react-effect-deps"] },
+      "notes": "Technology mismatch is not penalised when the query names the technology (spec §7.3)."
+    },
+    {
+      "id": "unity-content-hidden-from-web",
+      "categories": ["technology-specific"],
+      "query": "cache component lookups instead of calling them every frame",
+      "context": "web-shop",
+      "expect": { "irrelevant": ["unity.kb/avoid-find-in-update"] },
+      "notes": "Unity-only guidance should not qualify for a web project when the query does not target Unity."
+    },
+    {
+      "id": "same-project-save-change",
+      "categories": ["same-project", "blocking"],
+      "query": "change how save slots are written to disk",
+      "context": "space-game",
+      "files": ["Assets/Scripts/Save/SaveSystem.cs"],
+      "expect": {
+        "relevant": ["space-game.memory/save-system"],
+        "blocking": ["space-game.memory/save-format-v2-undecided"]
+      },
+      "notes": "File association surfaces the project memory and the blocking uncertainty."
+    },
+    {
+      "id": "blocking-by-symbol-only",
+      "categories": ["blocking"],
+      "query": "rename a field",
+      "context": "space-game",
+      "symbols": ["SaveSystem"],
+      "expect": { "blocking": ["space-game.memory/save-format-v2-undecided"] },
+      "notes": "A blocking uncertainty must surface on a symbol match even when the query text is unrelated (A4)."
+    },
+    {
+      "id": "same-project-level-loading",
+      "categories": ["same-project", "package-specific"],
+      "query": "load the next level asynchronously",
+      "context": "space-game",
+      "expect": { "relevant": ["space-game.memory/decision-addressables"], "irrelevant": ["web.kb/node-graceful-shutdown"] }
+    },
+    {
+      "id": "same-project-new-item",
+      "categories": ["same-project", "exact-identifier"],
+      "query": "add a new item type",
+      "context": "space-game",
+      "symbols": ["ItemDefinition"],
+      "expect": { "relevant": ["space-game.memory/inventory-items"] }
+    },
+    {
+      "id": "same-project-paraphrase",
+      "categories": ["same-project", "paraphrase"],
+      "query": "bullets pass through the player",
+      "context": "space-game",
+      "expect": { "relevant": ["space-game.memory/projectile-collisions"] },
+      "notes": "Paraphrase: 'bullets' vs 'projectiles'. Likely needs stemming or an alias; a known hard case."
+    },
+    {
+      "id": "strong-other-project",
+      "categories": ["other-project-strong"],
+      "query": "migrate old saved data to a new format version on load",
+      "context": "space-game",
+      "expect": {
+        "relevant": ["space-game.memory/save-system", "general.engineering/schema-versioning", "web-shop.memory/cart-state-versioning"],
+        "irrelevant": ["web-shop.memory/product-feed-csv"]
+      },
+      "notes": "Another project's experience qualifies on strong task relevance despite the penalty."
+    },
+    {
+      "id": "weak-other-project-tags",
+      "categories": ["other-project-weak"],
+      "query": "serialization of inventory items",
+      "context": "space-game",
+      "expect": {
+        "relevant": ["space-game.memory/inventory-items"],
+        "irrelevant": ["web-shop.memory/product-feed-csv"]
+      },
+      "notes": "Sharing the 'serialization' tag alone must not qualify another project's entry."
+    },
+    {
+      "id": "other-project-blocking-never-blocks",
+      "categories": ["blocking", "other-project-weak"],
+      "query": "round prices for the in-game shop",
+      "context": "space-game",
+      "expect": { "notBlocking": ["web-shop.memory/currency-rounding"] },
+      "notes": "Blocking uncertainties of another project never enter the blocking section."
+    }
+  ]
+}

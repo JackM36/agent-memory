@@ -1,0 +1,8 @@
+{
+  "$schema": "../../../docs/schema/collection.v1.schema.json",
+  "schema": 1,
+  "id": "web.kb",
+  "title": "Web development knowledge",
+  "readOnly": true,
+  "defaults": { "applies": { "scope": "general", "technologies": ["web", "typescript"] }, "source": "curated" }
+}

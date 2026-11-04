@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../docs/schema/collection.v1.schema.json",
+  "schema": 1,
+  "id": "unity.kb",
+  "title": "Unity knowledge",
+  "readOnly": true,
+  "defaults": { "applies": { "scope": "general", "technologies": ["unity", "csharp"] }, "source": "curated" },
+  "aliases": {
+    "ecs": ["entity component system", "entities", "dots"],
+    "srp": ["scriptable render pipeline"],
+    "urp": ["universal render pipeline"]
+  }
+}

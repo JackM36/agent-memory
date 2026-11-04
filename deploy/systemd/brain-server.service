@@ -1,0 +1,25 @@
+# brain-server without Docker. Install the self-contained build to /opt/agent-brain, create /var/lib/agent-brain,
+# run "brain-server init --data /var/lib/agent-brain" once, then:
+#   sudo cp brain-server.service /etc/systemd/system/ && sudo systemctl enable --now brain-server
+# Put it behind a TLS reverse proxy (transport "behind-proxy") or configure transport "tls" in host.json.
+[Unit]
+Description=Agent Brain server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agent-brain
+Group=agent-brain
+Environment=AGENT_BRAIN_DATA=/var/lib/agent-brain
+ExecStart=/opt/agent-brain/brain-server run
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/agent-brain
+
+[Install]
+WantedBy=multi-user.target

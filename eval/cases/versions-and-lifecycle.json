@@ -1,0 +1,83 @@
+{
+  "$comment": "Version applicability (spec §7.3, plan §5.5) and default lifecycle exclusions (spec §5.4).",
+  "cases": [
+    {
+      "id": "incompatible-excluded",
+      "categories": ["versions"],
+      "query": "convert authoring GameObjects to entities",
+      "context": "space-game",
+      "expect": { "relevant": ["unity.kb/entities-baking"], "irrelevant": ["unity.kb/legacy-entities-conversion"] },
+      "notes": "Context has com.unity.entities 1.2.4; the <1.0 entry is incompatible and excluded."
+    },
+    {
+      "id": "incompatible-included-on-request",
+      "categories": ["versions"],
+      "query": "convert authoring GameObjects to entities",
+      "context": "space-game",
+      "include": { "incompatible": true },
+      "expect": { "relevant": ["unity.kb/entities-baking", "unity.kb/legacy-entities-conversion"] },
+      "notes": "The explicit option includes it, flagged incompatible."
+    },
+    {
+      "id": "unknown-version-not-excluded",
+      "categories": ["versions"],
+      "query": "convert GameObjects to entities",
+      "context": "unity-no-versions",
+      "expect": { "relevant": ["unity.kb/entities-baking", "unity.kb/legacy-entities-conversion"] },
+      "notes": "Without a context version, compatibility is unknown: neither excluded nor credited."
+    },
+    {
+      "id": "engine-version-incompatible",
+      "categories": ["versions"],
+      "query": "await instead of coroutines",
+      "context": "space-game",
+      "expect": { "irrelevant": ["unity.kb/awaitable-async"] },
+      "notes": "Unity 2022.3.10f1 is outside >=2023.1."
+    },
+    {
+      "id": "history-excluded-by-default",
+      "categories": ["lifecycle"],
+      "query": "where are saves stored PlayerPrefs",
+      "context": "space-game",
+      "expect": { "relevant": ["space-game.memory/save-system"], "irrelevant": ["space-game.memory/playerprefs-saves"] }
+    },
+    {
+      "id": "history-included-on-request",
+      "categories": ["lifecycle"],
+      "query": "where are saves stored PlayerPrefs",
+      "context": "space-game",
+      "include": { "history": true },
+      "expect": { "relevant": ["space-game.memory/playerprefs-saves"] }
+    },
+    {
+      "id": "resolved-uncertainty-excluded",
+      "categories": ["lifecycle"],
+      "query": "can players remap gamepad buttons",
+      "context": "space-game",
+      "expect": { "relevant": ["space-game.memory/input-remapping"], "irrelevant": ["space-game.memory/gamepad-remapping-scope"] }
+    },
+    {
+      "id": "drafts-hidden",
+      "categories": ["lifecycle", "no-match"],
+      "query": "event sourcing trade-offs",
+      "context": "web-shop",
+      "expect": { "irrelevant": ["general.engineering/event-sourcing-draft"] }
+    },
+    {
+      "id": "reports-need-their-kind",
+      "categories": ["lifecycle"],
+      "query": "save corruption after crash",
+      "context": "space-game",
+      "expect": { "relevant": ["space-game.memory/save-system"], "irrelevant": ["space-game.memory/2026-10-12-save-corruption"] },
+      "notes": "Reports are excluded unless requested by kind."
+    },
+    {
+      "id": "reports-by-kind",
+      "categories": ["lifecycle"],
+      "query": "save corruption after crash",
+      "context": "space-game",
+      "filters": { "kinds": ["report"] },
+      "expect": { "relevant": ["space-game.memory/2026-10-12-save-corruption"] }
+    }
+  ]
+}

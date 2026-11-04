@@ -1,0 +1,35 @@
+{
+  "$comment": "Multi-source cases (spec §15.1). Evaluated from Phase 5, when federation exists. 'sources' lists corpus roots; corpus-mirror plays a second source exposing unity.kb.",
+  "cases": [
+    {
+      "id": "duplicate-identity-collapsed",
+      "phase": 5,
+      "categories": ["duplicates"],
+      "query": "JsonUtility dictionary support",
+      "context": "space-game",
+      "sources": ["corpus", "corpus-mirror"],
+      "expect": { "relevant": ["unity.kb/jsonutility-limitations"], "maxOccurrences": 1 },
+      "notes": "Identical copies collapse into one result listing both sources, with no conflict."
+    },
+    {
+      "id": "conflicting-revisions-visible",
+      "phase": 5,
+      "categories": ["duplicates"],
+      "query": "SerializeReference pitfalls",
+      "context": "space-game",
+      "sources": ["corpus", "corpus-mirror"],
+      "expect": { "relevant": ["unity.kb/serialize-reference"], "conflicts": ["unity.kb/serialize-reference"] },
+      "notes": "The mirror copy differs, so the result reports two revisions."
+    },
+    {
+      "id": "differently-sized-sources",
+      "phase": 5,
+      "categories": ["fusion"],
+      "query": "version the format of persisted data",
+      "context": "space-game",
+      "sources": ["corpus", "corpus-mirror"],
+      "expect": { "relevant": ["general.engineering/schema-versioning"], "first": "general.engineering/schema-versioning" },
+      "notes": "The small mirror's best result (JsonUtility, which only mentions format versions in passing) must not outrank the large source's excellent result. Rank interleaving alone could put it first."
+    }
+  ]
+}

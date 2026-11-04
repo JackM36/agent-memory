@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: build and test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+          - os: ubuntu-latest
+            rid: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build (warnings are errors)
+        run: dotnet build AgentBrain.slnx -c Release
+
+      - name: Test
+        run: dotnet test --solution AgentBrain.slnx -c Release --no-build
+
+      - name: Retrieval evaluation gate
+        # Accepted baseline: 38/43 variants (0.884), no irrelevant results (eval/baselines/phase5-porter.json).
+        run: dotnet run --project eval/AgentBrain.Evaluation -c Release --no-build -- --phase 5 --min-pass 0.85 --max-irrelevant 0
+
+      - name: Publish brain (Native AOT)
+        run: dotnet publish src/AgentBrain.Cli -c Release -r ${{ matrix.rid }} -o artifacts/brain-${{ matrix.rid }}
+
+      - name: Smoke test the AOT binary
+        shell: bash
+        run: ./artifacts/brain-${{ matrix.rid }}/brain --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: brain-${{ matrix.rid }}
+          path: artifacts/brain-${{ matrix.rid }}
+          retention-days: 7

@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/AgentBrain.Integrations/AgentBrain.Integrations.csproj" />
+  </ItemGroup>
+</Project>

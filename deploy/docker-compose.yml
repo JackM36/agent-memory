@@ -1,0 +1,40 @@
+# Agent Brain server behind Caddy (automatic HTTPS). See docs/deployment.md.
+#   cp .env.example .env   # set AGENT_BRAIN_DOMAIN
+#   docker compose run --rm brain-server init --collection personal
+#   docker compose up -d
+services:
+  brain-server:
+    image: ghcr.io/${AGENT_BRAIN_IMAGE_OWNER:-agent-brain}/agent-brain-server:${AGENT_BRAIN_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - brain-data:/data
+    networks: [internal]
+    # No published ports: only Caddy can reach it.
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [brain-server]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      AGENT_BRAIN_DOMAIN: ${AGENT_BRAIN_DOMAIN:?set AGENT_BRAIN_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [internal]
+
+networks:
+  internal:
+    # Caddy's address on this network is within the server's trusted proxy ranges (host.json trustedProxies).
+    driver: bridge
+
+volumes:
+  brain-data:
+  caddy-data:
+  caddy-config:

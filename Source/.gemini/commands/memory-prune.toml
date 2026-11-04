@@ -1,6 +1,0 @@
-description = "Find stale, duplicate, oversized, or superseded memory entries."
-prompt = """
-Follow `.agent-memory/commands/memory-prune.md`.
-
-Arguments: {{args}}
-"""

@@ -1,0 +1,24 @@
+{
+  "$comment": "Named query contexts referenced by cases. A case's own files/symbols are added to its context.",
+  "contexts": {
+    "space-game": {
+      "project": "space-game",
+      "technologies": ["unity", "csharp"],
+      "packages": {
+        "unity": "2022.3.10f1",
+        "com.unity.addressables": "1.21.19",
+        "com.unity.entities": "1.2.4",
+        "com.unity.inputsystem": "1.7.0",
+        "com.unity.render-pipelines.universal": "14.0.9"
+      }
+    },
+    "unity-no-versions": {
+      "project": "space-game",
+      "technologies": ["unity", "csharp"]
+    },
+    "web-shop": {
+      "project": "web-shop",
+      "technologies": ["web", "typescript", "react", "node.js"]
+    }
+  }
+}

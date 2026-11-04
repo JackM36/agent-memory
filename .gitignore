@@ -1,0 +1,17 @@
+# .NET build output
+bin/
+obj/
+out/
+artifacts/
+*.user
+*.suo
+.vs/
+.idea/
+TestResults/
+*.trx
+
+# Agent Brain runtime data (when this repo dogfoods itself)
+.agent-brain/config.local.json
+.agent-brain/local/
+# Agent Brain server environment
+deploy/.env

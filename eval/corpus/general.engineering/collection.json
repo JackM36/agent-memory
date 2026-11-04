@@ -1,0 +1,9 @@
+{
+  "$schema": "../../../docs/schema/collection.v1.schema.json",
+  "schema": 1,
+  "id": "general.engineering",
+  "title": "General software engineering knowledge",
+  "readOnly": true,
+  "defaults": { "applies": { "scope": "general" }, "source": "curated" },
+  "aliases": { "dip": ["dependency inversion principle", "dependency inversion"] }
+}

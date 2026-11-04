@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/AgentBrain.Contracts/AgentBrain.Contracts.csproj" />
+  </ItemGroup>
+</Project>

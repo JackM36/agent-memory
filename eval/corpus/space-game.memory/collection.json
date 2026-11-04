@@ -1,0 +1,7 @@
+{
+  "$schema": "../../../docs/schema/collection.v1.schema.json",
+  "schema": 1,
+  "id": "space-game.memory",
+  "title": "Space game project memory",
+  "defaults": { "applies": { "scope": "project", "projects": ["space-game"], "technologies": ["unity", "csharp"] }, "source": "observed" }
+}

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>brain-server</AssemblyName>
+    <!-- The server is published framework-dependent (plan §4); it does not need AOT. -->
+    <IsAotCompatible>false</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/AgentBrain.Composition/AgentBrain.Composition.csproj" />
+    <ProjectReference Include="../../src/AgentBrain.Contracts/AgentBrain.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+</Project>

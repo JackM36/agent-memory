@@ -1,0 +1,7 @@
+{
+  "$schema": "../../../docs/schema/collection.v1.schema.json",
+  "schema": 1,
+  "id": "web-shop.memory",
+  "title": "Web shop project memory",
+  "defaults": { "applies": { "scope": "project", "projects": ["web-shop"], "technologies": ["web", "typescript", "react"] }, "source": "observed" }
+}

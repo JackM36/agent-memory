@@ -1,0 +1,5 @@
+# Caddy obtains and renews a Let's Encrypt certificate for the domain automatically.
+{$AGENT_BRAIN_DOMAIN} {
+	encode gzip
+	reverse_proxy brain-server:8080
+}

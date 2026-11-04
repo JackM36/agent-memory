@@ -1,6 +1,0 @@
-description = "Initialize project instruction files for agent memory."
-prompt = """
-Follow `.agent-memory/commands/memory-init.md`.
-
-Arguments: {{args}}
-"""

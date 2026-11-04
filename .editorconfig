@@ -1,0 +1,68 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{json,jsonc,yml,yaml,props,targets,csproj,slnx,xml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_prefer_braces = when_multiline:suggestion
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+
+# Private fields: _camelCase
+dotnet_naming_rule.private_fields.symbols = private_fields
+dotnet_naming_rule.private_fields.style = underscore_camel
+dotnet_naming_rule.private_fields.severity = warning
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_fields.required_modifiers =
+dotnet_naming_style.underscore_camel.capitalization = camel_case
+dotnet_naming_style.underscore_camel.required_prefix = _
+
+# Private constants and static readonly fields: PascalCase (more specific modifiers take precedence)
+dotnet_naming_rule.private_constants.symbols = private_constants
+dotnet_naming_rule.private_constants.style = pascal
+dotnet_naming_rule.private_constants.severity = warning
+dotnet_naming_symbols.private_constants.applicable_kinds = field
+dotnet_naming_symbols.private_constants.applicable_accessibilities = private
+dotnet_naming_symbols.private_constants.required_modifiers = const
+dotnet_naming_rule.private_static_readonly.symbols = private_static_readonly
+dotnet_naming_rule.private_static_readonly.style = pascal
+dotnet_naming_rule.private_static_readonly.severity = warning
+dotnet_naming_symbols.private_static_readonly.applicable_kinds = field
+dotnet_naming_symbols.private_static_readonly.applicable_accessibilities = private
+dotnet_naming_symbols.private_static_readonly.required_modifiers = static, readonly
+dotnet_naming_style.pascal.capitalization = pascal_case
+
+# Async suffix
+dotnet_naming_rule.async_methods.symbols = async_methods
+dotnet_naming_rule.async_methods.style = async_suffix
+dotnet_naming_rule.async_methods.severity = warning
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.required_modifiers = async
+dotnet_naming_style.async_suffix.capitalization = pascal_case
+dotnet_naming_style.async_suffix.required_suffix = Async
+
+# Unused usings are errors in build (IDE0005 requires GenerateDocumentationFile to run in build; kept as suggestion)
+dotnet_diagnostic.IDE0005.severity = suggestion
+# Libraries do not call ConfigureAwait(false) everywhere; there is no SynchronizationContext in any host.
+dotnet_diagnostic.CA2007.severity = none
+# Agent Brain is consumed from C# only; VB keyword clashes (e.g. a type named Error) do not matter.
+dotnet_diagnostic.CA1716.severity = none
+# Result<T>.Success / Failure factories are the idiomatic shape for result types.
+dotnet_diagnostic.CA1000.severity = none
+# "Collection" is a domain noun here (a knowledge collection), not a .NET collection type.
+dotnet_diagnostic.CA1711.severity = none

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/AgentBrain.Application/AgentBrain.Application.csproj" />
+    <ProjectReference Include="../../src/AgentBrain.Contracts/AgentBrain.Contracts.csproj" />
+    <ProjectReference Include="../../src/AgentBrain.Infrastructure.Http/AgentBrain.Infrastructure.Http.csproj" />
+    <ProjectReference Include="../../src/AgentBrain.Infrastructure.Local/AgentBrain.Infrastructure.Local.csproj" />
+    <ProjectReference Include="../../src/AgentBrain.Infrastructure.Markdown/AgentBrain.Infrastructure.Markdown.csproj" />
+    <ProjectReference Include="../../src/AgentBrain.Infrastructure.Sqlite/AgentBrain.Infrastructure.Sqlite.csproj" />
+  </ItemGroup>
+</Project>

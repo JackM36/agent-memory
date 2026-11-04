@@ -1,0 +1,325 @@
+{
+  "tokenizer": "Porter",
+  "variants": 43,
+  "passed": 38,
+  "relevantExpected": 41,
+  "relevantFound": 36,
+  "irrelevantListed": 16,
+  "irrelevantFound": 0,
+  "meanBytes": 442,
+  "maxBytes": 1227,
+  "monotonicityViolations": 0,
+  "cases": [
+    {
+      "id": "general-from-unity",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 306
+    },
+    {
+      "id": "unity-polymorphic-lists",
+      "variant": "default",
+      "passed": false,
+      "failures": [
+        "missing unity.kb/serialize-reference"
+      ],
+      "bytes": 73
+    },
+    {
+      "id": "explicit-other-technology",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 347
+    },
+    {
+      "id": "same-project-save-change",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 489
+    },
+    {
+      "id": "blocking-by-symbol-only",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 856
+    },
+    {
+      "id": "same-project-level-loading",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 379
+    },
+    {
+      "id": "same-project-new-item",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 324
+    },
+    {
+      "id": "same-project-paraphrase",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 1004
+    },
+    {
+      "id": "strong-other-project",
+      "variant": "default",
+      "passed": false,
+      "failures": [
+        "missing space-game.memory/save-system"
+      ],
+      "bytes": 685
+    },
+    {
+      "id": "weak-other-project-tags",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 324
+    },
+    {
+      "id": "other-project-blocking-never-blocks",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 73
+    },
+    {
+      "id": "no-match-unrelated",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 73
+    },
+    {
+      "id": "alias-ecs",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 358
+    },
+    {
+      "id": "alias-srp",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 386
+    },
+    {
+      "id": "identifier-jsonutility",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 356
+    },
+    {
+      "id": "identifier-split",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 861
+    },
+    {
+      "id": "paraphrase-addressables-leak",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 591
+    },
+    {
+      "id": "relaxation-input",
+      "variant": "strict",
+      "passed": true,
+      "failures": [],
+      "bytes": 532
+    },
+    {
+      "id": "relaxation-input",
+      "variant": "broad",
+      "passed": true,
+      "failures": [],
+      "bytes": 1155
+    },
+    {
+      "id": "incompatible-excluded",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 358
+    },
+    {
+      "id": "incompatible-included-on-request",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 579
+    },
+    {
+      "id": "engine-version-incompatible",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 73
+    },
+    {
+      "id": "history-excluded-by-default",
+      "variant": "default",
+      "passed": false,
+      "failures": [
+        "missing space-game.memory/save-system"
+      ],
+      "bytes": 856
+    },
+    {
+      "id": "history-included-on-request",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 1020
+    },
+    {
+      "id": "resolved-uncertainty-excluded",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 532
+    },
+    {
+      "id": "reports-need-their-kind",
+      "variant": "default",
+      "passed": false,
+      "failures": [
+        "missing space-game.memory/save-system"
+      ],
+      "bytes": 73
+    },
+    {
+      "id": "reports-by-kind",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 330
+    },
+    {
+      "id": "general-from-web",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 306
+    },
+    {
+      "id": "general-naming",
+      "variant": "default",
+      "passed": false,
+      "failures": [
+        "missing general.engineering/naming-intent"
+      ],
+      "bytes": 73
+    },
+    {
+      "id": "web-stale-effect",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 511
+    },
+    {
+      "id": "web-search-as-you-type",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 324
+    },
+    {
+      "id": "unity-content-hidden-from-web",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 73
+    },
+    {
+      "id": "no-match-ops",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 73
+    },
+    {
+      "id": "alias-dip",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 338
+    },
+    {
+      "id": "paraphrase-retry",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 339
+    },
+    {
+      "id": "paraphrase-sigterm",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 362
+    },
+    {
+      "id": "relaxation-logging",
+      "variant": "strict",
+      "passed": true,
+      "failures": [],
+      "bytes": 517
+    },
+    {
+      "id": "relaxation-logging",
+      "variant": "broad",
+      "passed": true,
+      "failures": [],
+      "bytes": 517
+    },
+    {
+      "id": "drafts-hidden",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 73
+    },
+    {
+      "id": "duplicate-identity-collapsed",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 356
+    },
+    {
+      "id": "conflicting-revisions-visible",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 351
+    },
+    {
+      "id": "differently-sized-sources",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 1227
+    },
+    {
+      "id": "unknown-version-not-excluded",
+      "variant": "default",
+      "passed": true,
+      "failures": [],
+      "bytes": 565
+    }
+  ]
+}

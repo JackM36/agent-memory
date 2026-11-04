@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-brain.dev/schema/config.v1.schema.json",
+  "title": "Agent Brain configuration (schema 1)",
+  "description": "Used for the user file, .agent-brain/config.json and .agent-brain/config.local.json. Precedence: per-call > config.local.json > config.json > user file > built-in defaults. Relative paths resolve against the directory of the file that declares them.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": 1 },
+    "inheritUser": {
+      "type": "boolean",
+      "description": "Project files only. false ignores the user file entirely (reproducible CI, shared repos)."
+    },
+    "project": {
+      "type": "object",
+      "description": "Project files only.",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "technologies": { "type": "array", "items": { "$ref": "#/$defs/technicalName" } },
+        "packages": {
+          "type": "object",
+          "description": "Package (or engine, e.g. unity) name to concrete version.",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "collections": {
+      "type": "object",
+      "description": "Local collections by collection ID. A higher level replaces a same-named entry whole; enabled: false removes it.",
+      "propertyNames": { "$ref": "#/$defs/identifier" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "capabilities": {
+            "type": "array",
+            "items": { "enum": ["read", "maintain", "propose", "publish"] },
+            "default": ["read"]
+          },
+          "immediatePublish": { "type": "boolean", "default": false },
+          "enabled": { "type": "boolean" }
+        }
+      }
+    },
+    "connections": {
+      "type": "object",
+      "description": "Remote Agent Brain hosts by name. A higher level replaces a same-named entry whole; enabled: false removes it.",
+      "propertyNames": { "$ref": "#/$defs/identifier" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "url": { "type": "string", "format": "uri", "description": "https, or http on loopback only." },
+          "credentialEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Name of the environment variable holding the API key. Never the key itself." },
+          "collections": { "type": "array", "items": { "$ref": "#/$defs/identifier" } },
+          "timeoutMs": { "type": "integer", "minimum": 100, "maximum": 120000, "default": 3000 },
+          "forward": {
+            "type": "object",
+            "description": "Project context sent to this connection. Everything is off by default.",
+            "additionalProperties": false,
+            "properties": {
+              "project": { "type": "boolean" },
+              "technologies": { "type": "boolean" },
+              "files": { "type": "boolean" },
+              "symbols": { "type": "boolean" }
+            }
+          },
+          "enabled": { "type": "boolean" }
+        }
+      }
+    },
+    "writes": {
+      "type": "object",
+      "description": "Project files only.",
+      "additionalProperties": false,
+      "properties": {
+        "defaultCollection": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "sourcePreference": {
+      "type": "array",
+      "description": "Collection IDs and connection names, preferred first, for fetching duplicate identities.",
+      "items": { "type": "string" }
+    },
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "relaxation": {
+          "description": "strict, default, broad, or a number in [0, 1] written as a string.",
+          "type": "string"
+        },
+        "maxResults": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 },
+        "maxTokens": { "type": "integer", "minimum": 50, "maximum": 100000, "default": 1000 },
+        "maxBytes": { "type": "integer", "minimum": 256, "maximum": 10000000, "default": 4000 },
+        "candidatesPerSource": { "type": "integer", "minimum": 1, "maximum": 500, "default": 20 },
+        "kinds": {
+          "type": "array",
+          "items": { "enum": ["knowledge", "memory", "note", "uncertainty", "report"] },
+          "default": ["knowledge", "memory", "uncertainty"]
+        },
+        "log": { "type": "boolean", "default": false, "description": "Opt-in local query log for calibration." }
+      }
+    },
+    "get": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxBytes": { "type": "integer", "minimum": 1024, "maximum": 10000000, "default": 24576 },
+        "batchTargets": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 },
+        "batchBytes": { "type": "integer", "minimum": 1024, "maximum": 10000000, "default": 49152 }
+      }
+    },
+    "aliases": {
+      "type": "object",
+      "description": "Equivalence groups: term to equivalent terms. Union across levels; the higher level wins a term.",
+      "additionalProperties": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+    },
+    "runtimeDir": { "type": "string", "description": "Project files only. Git-ignored runtime data directory. Default: local", "default": "local" },
+    "proposals": { "type": "string", "description": "Project files only. Durable local proposals. Default: proposals", "default": "proposals" },
+    "forwardContext": { "type": "boolean", "description": "false forwards no project context to any connection.", "default": true }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$", "maxLength": 64 },
+    "technicalName": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.+#_-]*$", "maxLength": 64 }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-brain.dev/schema/collection.v1.schema.json",
+  "title": "Agent Brain collection descriptor (collection.json, schema 1)",
+  "description": "Stored at the root of every collection. Identity, read-only flag, defaults applied field by field to entries, limits and collection-scoped aliases.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "title", "defaults"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$", "maxLength": 64 },
+    "title": { "type": "string", "minLength": 1 },
+    "readOnly": {
+      "type": "boolean",
+      "default": false,
+      "description": "Packages declare this. It caps every registration to read-only; nothing can elevate it."
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applies"],
+      "properties": {
+        "applies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scope"],
+          "properties": {
+            "scope": { "enum": ["general", "project"] },
+            "projects": { "type": "array", "items": { "type": "string" } },
+            "technologies": { "type": "array", "items": { "type": "string" } },
+            "packages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "versions"],
+                "properties": { "name": { "type": "string" }, "versions": { "type": "string" } }
+              }
+            },
+            "platforms": { "type": "array", "items": { "type": "string" } }
+          },
+          "if": { "properties": { "scope": { "const": "project" } } },
+          "then": { "required": ["projects"] }
+        },
+        "source": { "enum": ["curated", "observed"], "default": "observed" },
+        "publication": { "enum": ["draft", "published"], "default": "published" }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "summaryMax": { "type": "integer", "minimum": 40, "maximum": 240, "default": 240 }
+      }
+    },
+    "aliases": {
+      "type": "object",
+      "description": "Applied only when scoring this collection's entries.",
+      "additionalProperties": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+    }
+  }
+}

@@ -1,6 +1,0 @@
-description = "Query agent memory for the smallest relevant context."
-prompt = """
-Follow `.agent-memory/commands/memory-query.md`.
-
-Arguments: {{args}}
-"""

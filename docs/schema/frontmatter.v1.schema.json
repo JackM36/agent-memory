@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-brain.dev/schema/frontmatter.v1.schema.json",
+  "title": "Agent Brain entry frontmatter (schema 1)",
+  "description": "YAML frontmatter of an entry Markdown file. Unknown fields are errors; fields prefixed x- are preserved and ignored. Applicability fields fall back to the collection default field by field.",
+  "type": "object",
+  "required": ["schema", "id", "kind", "title", "summary"],
+  "patternProperties": {
+    "^x-": {}
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 80 },
+    "kind": { "enum": ["knowledge", "memory", "note", "uncertainty", "report"] },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120, "pattern": "^[^\\r\\n]*$" },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^[^\\r\\n]*$",
+      "description": "Authored, single line. A collection may lower the limit."
+    },
+    "tags": { "type": "array", "maxItems": 12, "items": { "type": "string" }, "description": "Normalised to lowercase kebab-case." },
+    "applies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope": { "enum": ["general", "project"] },
+        "projects": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" } },
+        "technologies": { "type": "array", "items": { "type": "string" } },
+        "packages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "versions"],
+            "properties": {
+              "name": { "type": "string" },
+              "versions": { "type": "string", "description": "e.g. '>=1.2 <2.0', '=2022.3.10f1', '>=1.0 <1.5 || >=3.1'" }
+            }
+          }
+        },
+        "platforms": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "files": { "type": "array", "maxItems": 50, "items": { "type": "string" }, "description": "Project-relative globs." },
+    "symbols": { "type": "array", "maxItems": 50, "items": { "type": "string" } },
+    "source": { "enum": ["curated", "observed"] },
+    "evidence": { "type": "array", "maxItems": 20, "items": { "type": "string", "maxLength": 300 } },
+    "verified": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["on", "by"],
+      "properties": {
+        "on": { "type": "string", "format": "date" },
+        "by": { "enum": ["code", "user", "tests", "repeated-use", "unverified"] }
+      }
+    },
+    "publication": { "enum": ["draft", "published"] },
+    "archived": { "type": "string", "format": "date" },
+    "superseded-by": { "$ref": "#/$defs/entryLink" },
+    "origin": { "$ref": "#/$defs/entryLink" },
+    "resolution": { "enum": ["unresolved", "resolved"], "description": "Uncertainties only (required for them)." },
+    "blocking": { "type": "boolean", "description": "Uncertainties only." },
+    "resolved-by": { "$ref": "#/$defs/entryLink" },
+    "created": { "type": "string", "format": "date" },
+    "updated": { "type": "string", "format": "date" }
+  },
+  "$defs": {
+    "entryLink": { "type": "string", "pattern": "^entry://[a-z0-9]+(?:[.-][a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$" }
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "$comment": "No-match queries, aliases, exact identifiers, paraphrases and relaxation variants (spec §15.1).",
+  "cases": [
+    {
+      "id": "no-match-ops",
+      "categories": ["no-match"],
+      "query": "kubernetes helm chart rollback",
+      "context": "web-shop",
+      "expect": { "empty": true }
+    },
+    {
+      "id": "no-match-unrelated",
+      "categories": ["no-match"],
+      "query": "quantum annealing schedule",
+      "context": "space-game",
+      "expect": { "empty": true }
+    },
+    {
+      "id": "alias-ecs",
+      "categories": ["alias"],
+      "query": "ECS baking",
+      "context": "space-game",
+      "expect": { "relevant": ["unity.kb/entities-baking"] }
+    },
+    {
+      "id": "alias-srp",
+      "categories": ["alias"],
+      "query": "custom srp pass",
+      "context": "space-game",
+      "expect": { "relevant": ["unity.kb/urp-render-features"] }
+    },
+    {
+      "id": "alias-dip",
+      "categories": ["alias"],
+      "query": "dip violation in my services",
+      "context": "web-shop",
+      "expect": { "relevant": ["general.engineering/dependency-direction"] }
+    },
+    {
+      "id": "identifier-jsonutility",
+      "categories": ["exact-identifier"],
+      "query": "JsonUtility dictionary",
+      "context": "space-game",
+      "expect": { "relevant": ["unity.kb/jsonutility-limitations"] }
+    },
+    {
+      "id": "identifier-split",
+      "categories": ["exact-identifier"],
+      "query": "save system write slot",
+      "context": "space-game",
+      "expect": { "relevant": ["space-game.memory/save-system"] },
+      "notes": "Identifier splitting: SaveSystem.WriteSlot matches 'save system write slot'."
+    },
+    {
+      "id": "paraphrase-addressables-leak",
+      "categories": ["paraphrase"],
+      "query": "memory keeps growing after unloading prefabs loaded by address",
+      "context": "space-game",
+      "expect": { "relevant": ["unity.kb/addressables-release"] }
+    },
+    {
+      "id": "paraphrase-retry",
+      "categories": ["paraphrase"],
+      "query": "flaky network call, try again with increasing delays",
+      "context": "web-shop",
+      "expect": { "relevant": ["general.engineering/retry-with-backoff"] }
+    },
+    {
+      "id": "paraphrase-sigterm",
+      "categories": ["paraphrase"],
+      "query": "server should finish requests before the container stops",
+      "context": "web-shop",
+      "expect": { "relevant": ["web.kb/node-graceful-shutdown"] }
+    },
+    {
+      "id": "relaxation-input",
+      "categories": ["relaxation"],
+      "query": "player input handling",
+      "context": "space-game",
+      "variants": [
+        { "relaxation": "strict", "expect": { "relevant": ["space-game.memory/input-remapping"] } },
+        { "relaxation": "broad", "expect": { "relevant": ["space-game.memory/input-remapping", "unity.kb/input-system-actions"] } }
+      ],
+      "notes": "Admission must be monotonic: everything admitted at strict is admitted at broad."
+    },
+    {
+      "id": "relaxation-logging",
+      "categories": ["relaxation"],
+      "query": "observability",
+      "context": "web-shop",
+      "variants": [
+        { "relaxation": "strict", "expect": { "relevant": ["general.engineering/structured-logging"] } },
+        { "relaxation": "broad", "expect": { "relevant": ["general.engineering/structured-logging"], "irrelevant": ["web-shop.memory/decision-monorepo"] } }
+      ],
+      "notes": "Broad admission must still not fill slots with unrelated content."
+    }
+  ]
+}

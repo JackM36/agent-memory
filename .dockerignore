@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/TestResults/
+.git/
+artifacts/
+eval/
+tests/
+_SPECS/
+docs/
+deploy/.env
