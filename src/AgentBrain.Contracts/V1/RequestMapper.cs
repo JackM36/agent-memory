@@ -1,11 +1,17 @@
 using System.Globalization;
+using AgentBrain.Application.Abstractions.Proposals;
+using AgentBrain.Application.Capture;
 using AgentBrain.Application.Common;
 using AgentBrain.Application.Configuration;
 using AgentBrain.Application.Operations.Discovery;
+using AgentBrain.Application.Operations.Maintenance;
 using AgentBrain.Application.Operations.Proposals;
+using AgentBrain.Application.Operations.Publishing;
+using AgentBrain.Application.Operations.Routing;
 using AgentBrain.Application.Retrieval;
 using AgentBrain.Application.Retrieval.Ranking;
 using AgentBrain.Application.Writing;
+using AgentBrain.Domain.Access;
 using AgentBrain.Domain.Entries;
 using AgentBrain.Domain.Identity;
 using AgentBrain.Domain.Revisions;
@@ -107,6 +113,7 @@ public static class RequestMapper
                 NewEntry = new NewEntry(entryKind, dto.Title, dto.Summary, dto.Body ?? "")
                 {
                     Id = id, Tags = dto.Tags ?? [], Files = dto.Files ?? [], Symbols = dto.Symbols ?? [], Evidence = dto.Evidence ?? [], Blocking = dto.Blocking,
+                    Applies = dto.Technologies is { Count: > 0 } technologies ? new ApplicabilityOverrides(Technologies: technologies) : null,
                 },
             };
         }
@@ -266,5 +273,82 @@ public static class RequestMapper
         ArgumentNullException.ThrowIfNull(dto);
         var code = ErrorCodes.Names.TryParse(dto.Code, out var parsed) ? parsed : ErrorCode.ProviderUnavailable;
         return new Error(code, dto.Message, dto.Details);
+    }
+
+    // ---- Client side: remote writes ----
+
+    /// <summary>A change as the host's write endpoints expect it. The host prepares it; the client sends only intent.</summary>
+    public static ChangeRequestDto FromChangeRequest(ChangeRequest request, string? note = null, IReadOnlyCollection<string>? allowedSecretRules = null)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var allow = allowedSecretRules is { Count: > 0 } rules ? rules.ToList() : null;
+        var kind = request.Kind.ToString().ToLowerInvariant();
+        if (request.NewEntry is { } e)
+        {
+            return new ChangeRequestDto(
+                kind, request.Collection.Value, e.Id?.Value, null, WireNames.Kinds.Name(e.Kind), e.Title, e.Summary, e.Body,
+                e.Tags, e.Files, e.Symbols, e.Evidence, Blocking: e.Blocking, Note: note,
+                Technologies: e.Applies?.Technologies is { Count: > 0 } technologies ? technologies : null, AllowSecretRules: allow);
+        }
+
+        var p = request.Patch;
+        return new ChangeRequestDto(
+            kind, request.Collection.Value, request.Entry?.Value, request.BaseRevision?.Value, null, p?.Title, p?.Summary, p?.Body,
+            p?.Tags, p?.Files, p?.Symbols, p?.Evidence, p?.Archive ?? false, p?.SupersededBy?.ToString(), p?.ResolvedBy?.ToString(),
+            p?.Blocking ?? false, note, AllowSecretRules: allow);
+    }
+
+    public static Result<WriteResult> ToWriteResult(WriteResponseDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        if (!EntryRef.TryParse(dto.Ref, out var target))
+        {
+            return Error.Validation($"The host returned an invalid reference '{dto.Ref}'.");
+        }
+
+        Revision? revision = Revision.TryParse(dto.Rev, out var r) ? r : null;
+        var similar = dto.Similar.Where(s => EntryRef.TryParse(s.Ref, out _)).Select(s => new SimilarEntry(EntryRef.Parse(s.Ref), s.Title, s.Summary)).ToList();
+        return new WriteResult(target, revision, similar);
+    }
+
+    public static Result<ProposalView> ToProposalView(ProposalDto dto, string source)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        if (!Enum.TryParse<ProposalStatus>(dto.Status, true, out var status) || !Enum.TryParse<ChangeKind>(dto.Kind, true, out var kind) || !EntryRef.TryParse(dto.Target, out var target))
+        {
+            return Error.Validation($"The host returned a proposal this client cannot read ({dto.Id}).");
+        }
+
+        var created = DateTimeOffset.TryParse(dto.CreatedAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var at) ? at : DateTimeOffset.MinValue;
+        return new ProposalView(dto.Id, status, kind, target, dto.BaseRevision, dto.Title, dto.Summary, dto.ProposedBy, created, dto.Note, dto.ReviewedBy, dto.ReviewNote, dto.Body, source);
+    }
+
+    public static IReadOnlyList<PublishedChange> ToPublished(PublishResponseDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        return [.. dto.Published
+            .Where(p => EntryRef.TryParse(p.Ref, out _) && Enum.TryParse<ChangeKind>(p.Kind, true, out _))
+            .Select(p => new PublishedChange(EntryRef.Parse(p.Ref), Enum.Parse<ChangeKind>(p.Kind, true), Revision.TryParse(p.Rev, out var r) ? r : null))];
+    }
+
+    /// <summary>A hosted collection as this client sees it: the key's effective capabilities, attributed to the connection.</summary>
+    public static CollectionInfo? ToCollectionInfo(CollectionDto dto, string source)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        if (!CollectionId.TryParse(dto.Id, out var id))
+        {
+            return null;
+        }
+
+        var capabilities = Capability.None;
+        foreach (var name in dto.Capabilities)
+        {
+            if (Capabilities.Names.TryParse(name, out var capability))
+            {
+                capabilities |= capability;
+            }
+        }
+
+        return new CollectionInfo(id, dto.Title, capabilities, dto.ReadOnly, source);
     }
 }

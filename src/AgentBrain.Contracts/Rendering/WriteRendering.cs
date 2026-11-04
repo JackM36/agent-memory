@@ -5,6 +5,7 @@ using AgentBrain.Application.Abstractions.Proposals;
 using AgentBrain.Application.Capture;
 using AgentBrain.Application.Operations.Maintenance;
 using AgentBrain.Application.Operations.Publishing;
+using AgentBrain.Application.Operations.Routing;
 using AgentBrain.Application.Writing;
 using AgentBrain.Contracts.V1;
 
@@ -70,22 +71,28 @@ public static class WriteRendering
     public static string Proposals(IReadOnlyList<Proposal> proposals, bool json, bool withBody = false)
     {
         ArgumentNullException.ThrowIfNull(proposals);
+        return Proposals([.. proposals.Select(p => ProposalView.From(p, withBody))], json, withBody);
+    }
+
+    /// <summary>Local and remote proposals alike; remote IDs are shown as <c>source:id</c>, the form review commands accept.</summary>
+    public static string Proposals(IReadOnlyList<ProposalView> proposals, bool json, bool withBody = false, IReadOnlyList<string>? unavailable = null)
+    {
+        ArgumentNullException.ThrowIfNull(proposals);
         if (json)
         {
             return JsonSerializer.Serialize(new ProposalsResponseDto(ProtocolVersions.Protocol, [.. proposals.Select(p => ToDto(p, withBody))]), ContractsJsonContext.Default.ProposalsResponseDto);
         }
 
+        var text = new StringBuilder();
         if (proposals.Count == 0)
         {
-            return "no proposals\n";
+            text.Append("no proposals\n");
         }
 
-        var text = new StringBuilder();
         foreach (var p in proposals)
         {
-            var c = p.Change;
             text.Append(CultureInfo.InvariantCulture,
-                $"{p.Id} [{p.Status.ToString().ToLowerInvariant()}] {c.Kind.ToString().ToLowerInvariant()} {c.Target}{(c.Metadata is null ? "" : " — " + c.Metadata.Title)} · by {p.ProposedBy} · {p.CreatedAt:yyyy-MM-dd HH:mm}Z\n");
+                $"{p.QualifiedId} [{p.Status.ToString().ToLowerInvariant()}] {Kind(p.Kind)} {p.Target}{(p.Title is null ? "" : " — " + p.Title)} · by {p.ProposedBy} · {p.CreatedAt:yyyy-MM-dd HH:mm}Z\n");
             if (p.Note is not null)
             {
                 text.Append("  note: ").Append(p.Note).Append('\n');
@@ -96,14 +103,34 @@ public static class WriteRendering
                 text.Append(CultureInfo.InvariantCulture, $"  reviewed by {p.ReviewedBy}{(p.ReviewNote is null ? "" : ": " + p.ReviewNote)}\n");
             }
 
-            if (withBody && c.Metadata is not null)
+            if (withBody && p.Body is not null)
             {
-                text.Append(CultureInfo.InvariantCulture, $"  summary: {c.Metadata.Summary}\n  base revision: {c.BaseRevision?.Value ?? "(new entry)"}\n");
-                text.Append("── proposed body\n").Append(c.Body).Append("── end proposed body\n");
+                text.Append(CultureInfo.InvariantCulture, $"  summary: {p.Summary}\n  base revision: {p.BaseRevision ?? "(new entry)"}\n");
+                text.Append("── proposed body\n").Append(p.Body).Append("── end proposed body\n");
             }
         }
 
+        foreach (var source in unavailable ?? [])
+        {
+            text.Append("unavailable ").Append(source).Append('\n');
+        }
+
         return text.ToString();
+    }
+
+    /// <summary>A save: the written entry, or the proposal it became because the target only accepts proposals.</summary>
+    public static string Saved(SaveOutcome outcome, string action, bool json)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        if (outcome.Written is { } written)
+        {
+            return Written(written, action, json);
+        }
+
+        var proposal = outcome.Proposed!;
+        return json
+            ? Proposals([proposal], json: true)
+            : $"proposed {Kind(proposal.Kind)} {proposal.Target} as {proposal.QualifiedId} — the collection takes proposals, so nothing changes until a reviewer accepts it\n";
     }
 
     public static string Published(IReadOnlyList<PublishedChange> published, bool json)
@@ -159,18 +186,18 @@ public static class WriteRendering
 
     private static string Kind(ChangeKind kind) => kind.ToString().ToLowerInvariant();
 
-    private static ProposalDto ToDto(Proposal p, bool withBody) => new(
-        p.Id,
+    private static ProposalDto ToDto(ProposalView p, bool withBody) => new(
+        p.QualifiedId,
         p.Status.ToString().ToLowerInvariant(),
-        Kind(p.Change.Kind),
-        p.Change.Target.ToString(),
-        p.Change.BaseRevision?.Value,
-        p.Change.Metadata?.Title,
-        p.Change.Metadata?.Summary,
-        p.ProposedBy.ToString(),
+        Kind(p.Kind),
+        p.Target.ToString(),
+        p.BaseRevision,
+        p.Title,
+        p.Summary,
+        p.ProposedBy,
         p.CreatedAt.ToString("O", CultureInfo.InvariantCulture),
         p.Note,
-        p.ReviewedBy?.ToString(),
+        p.ReviewedBy,
         p.ReviewNote,
-        withBody ? p.Change.Body : null);
+        withBody ? p.Body : null);
 }

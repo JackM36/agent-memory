@@ -60,13 +60,14 @@ public static partial class ConfigLayering
             var search = ResolveSearch();
             var get = ResolveGet();
             var aliases = ResolveAliases();
-            var defaultWrite = ResolveDefaultWrite(collections);
+            var memoryWrite = ResolveMemoryWrite(collections);
+            var knowledgeWrite = ResolveKnowledgeWrite(collections, connections);
             var sourcePreference = ResolveSourcePreference(collections, connections);
             var runtimeDir = _input.Project is null ? null : PickPath("runtimeDir", d => d.RuntimeDir);
             var proposalsDir = _input.Project is null ? null : PickPath("proposals", d => d.Proposals);
 
             var configuration = new EffectiveConfiguration(
-                project, collections, connections, defaultWrite, sourcePreference, search, get, aliases,
+                project, collections, connections, memoryWrite, knowledgeWrite, sourcePreference, search, get, aliases,
                 runtimeDir, proposalsDir, _origins);
             return new ConfigResolution(configuration, _diagnostics);
         }
@@ -93,7 +94,7 @@ public static partial class ConfigLayering
                 foreach (var (field, present) in new[]
                 {
                     ("project", d.Project is not null),
-                    ("writes", d.Writes is not null),
+                    ("writes.memory", d.Writes?.Memory is not null),
                     ("runtimeDir", d.RuntimeDir is not null),
                     ("proposals", d.Proposals is not null),
                     ("inheritUser", d.InheritUser is not null),
@@ -105,7 +106,7 @@ public static partial class ConfigLayering
                     }
                 }
 
-                _layers[i] = layer with { Document = d with { Project = null, Writes = null, RuntimeDir = null, Proposals = null, InheritUser = null } };
+                _layers[i] = layer with { Document = d with { Project = null, Writes = d.Writes is null ? null : d.Writes with { Memory = null }, RuntimeDir = null, Proposals = null, InheritUser = null } };
             }
         }
 
@@ -329,29 +330,70 @@ public static partial class ConfigLayering
             return [.. byKey.Select(kv => new AliasGroup([kv.Key, .. kv.Value]))];
         }
 
-        private CollectionId? ResolveDefaultWrite(List<RegisteredCollection> collections)
+        private CollectionId? ResolveMemoryWrite(List<RegisteredCollection> collections)
         {
-            var name = Pick("writes.defaultCollection", d => d.Writes?.DefaultCollection);
+            var name = Pick("writes.memory", d => d.Writes?.Memory);
             if (name is null)
             {
                 return null;
             }
 
-            var origin = _origins["writes.defaultCollection"];
+            var origin = _origins["writes.memory"];
             var collection = collections.Find(c => c.Id.Value == name);
             if (collection is null)
             {
-                Fail("writes.defaultCollection", $"'{name}' is not a configured collection.", origin);
+                Fail("writes.memory", $"'{name}' is not a configured collection.", origin);
                 return null;
             }
 
             if (!collection.Capabilities.HasFlag(Capability.Maintain))
             {
-                Fail("writes.defaultCollection", $"'{name}' does not have the 'maintain' capability, so it cannot be the default write destination.", origin);
+                Fail("writes.memory", $"'{name}' does not have the 'maintain' capability, so it cannot be the project memory destination.", origin);
                 return null;
             }
 
             return collection.Id;
+        }
+
+        /// <summary>
+        /// Where reusable knowledge goes. Allowed in the user file. A local target needs maintain or propose (a
+        /// propose-only target turns saves into proposals); a remote one must belong to a connection, and its
+        /// capabilities are checked against the host when writing.
+        /// </summary>
+        private CollectionId? ResolveKnowledgeWrite(List<RegisteredCollection> collections, List<EffectiveConnection> connections)
+        {
+            var name = Pick("writes.knowledge", d => d.Writes?.Knowledge);
+            if (name is null)
+            {
+                return null;
+            }
+
+            var origin = _origins["writes.knowledge"];
+            if (!CollectionId.TryParse(name, out var id))
+            {
+                Fail("writes.knowledge", $"'{name}' is not a valid collection ID.", origin);
+                return null;
+            }
+
+            if (collections.Find(c => c.Id == id) is { } local)
+            {
+                if (!local.Capabilities.HasFlag(Capability.Maintain) && !local.Capabilities.HasFlag(Capability.Propose))
+                {
+                    Fail("writes.knowledge", $"'{name}' has neither 'maintain' nor 'propose', so nothing can be saved to it.", origin);
+                    return null;
+                }
+
+                return id;
+            }
+
+            // A connection without a collection list serves whatever its key can read; the host decides.
+            if (connections.Any(c => c.Collections.Count == 0 || c.Collections.Contains(id)))
+            {
+                return id;
+            }
+
+            Fail("writes.knowledge", $"'{name}' is neither a configured collection nor served by a connection.", origin);
+            return null;
         }
 
         private List<string> ResolveSourcePreference(List<RegisteredCollection> collections, List<EffectiveConnection> connections)

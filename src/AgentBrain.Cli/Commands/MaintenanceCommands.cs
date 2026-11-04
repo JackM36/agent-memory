@@ -122,7 +122,7 @@ internal static class MaintenanceCommands
             Line($"connections.{connection.Name}", $"{connection.Url} key from ${connection.Credential.EnvironmentVariable} forward [{forward}] timeout {connection.Timeout.TotalMilliseconds}ms");
         }
 
-        Line("writes.defaultCollection", c.DefaultWriteCollection?.Value ?? "(none)");
+        Line("writes.memory", c.MemoryCollection?.Value ?? "(none)");
         Line("sourcePreference", Join(c.SourcePreference));
         Line("search.relaxation", c.Search.Relaxation.ToString());
         Line("search.maxResults", Number(c.Search.MaxResults));

@@ -30,7 +30,7 @@ public sealed class MaintenanceOperation(
     public async ValueTask<Result<WriteResult>> CreateAsync(CallerContext caller, CollectionId? collectionId, NewEntry entry, IReadOnlyCollection<string> allowedSecretRules, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        var collection = Resolve(caller, collectionId ?? configuration.DefaultWriteCollection);
+        var collection = Resolve(caller, collectionId ?? configuration.MemoryCollection);
         if (!collection.IsSuccess)
         {
             return collection.Error;
@@ -99,10 +99,10 @@ public sealed class MaintenanceOperation(
     /// <summary>The likely-duplicate check on its own (<c>brain similar</c>).</summary>
     public async ValueTask<Result<IReadOnlyList<SimilarEntry>>> SimilarAsync(CollectionId? collectionId, string title, string summary, IReadOnlyList<string> tags, CancellationToken cancellationToken)
     {
-        var id = collectionId ?? configuration.DefaultWriteCollection;
+        var id = collectionId ?? configuration.MemoryCollection;
         if (id is null)
         {
-            return Error.Validation("No collection given and no writes.defaultCollection configured.");
+            return Error.Validation("No collection given and no writes.memory configured.");
         }
 
         await freshness.EnsureFreshAsync(cancellationToken);
@@ -113,7 +113,7 @@ public sealed class MaintenanceOperation(
     {
         if (id is null)
         {
-            return Error.Validation("No collection given and no writes.defaultCollection configured. Pass --collection or run brain init.");
+            return Error.Validation("No collection given and no writes.memory configured. Pass --collection or run brain init.");
         }
 
         var collection = catalog.Find(id);

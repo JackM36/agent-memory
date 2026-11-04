@@ -158,6 +158,7 @@ public sealed class HostRuntime : IDisposable
             [.. host.Collections.Select(c => new RegisteredCollection(c.Id, c.Path ?? "", all, c.ImmediatePublish))],
             [],
             null,
+            null,
             [],
             new SearchSettings(Relaxation.Default, ConfigDefaults.MaxResults, ConfigDefaults.MaxTokens, ConfigDefaults.MaxBytes, ConfigDefaults.CandidatesPerSource,
                 [EntryKind.Knowledge, EntryKind.Memory, EntryKind.Uncertainty], false),

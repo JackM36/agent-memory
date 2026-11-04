@@ -60,7 +60,9 @@ public sealed record ChangeRequestDto(
     string? ResolvedBy = null,
     bool Blocking = false,
     string? Note = null,
-    string? Action = null);
+    string? Action = null,
+    IReadOnlyList<string>? Technologies = null,
+    IReadOnlyList<string>? AllowSecretRules = null);
 
 public sealed record PublishRequestDto(IReadOnlyList<ChangeRequestDto> Changes);
 

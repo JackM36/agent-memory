@@ -55,7 +55,7 @@ public sealed class WriteCommandTests : IDisposable
                 "team.kb": { "path": "curated", "capabilities": ["read", "propose", "publish"], "immediatePublish": {{(immediatePublish ? "true" : "false")}} },
                 "vendor.kb": { "path": "package", "capabilities": ["read", "maintain", "publish"] }
               },
-              "writes": { "defaultCollection": "game.memory" }
+              "writes": { "memory": "game.memory" }
             }
             """);
 
@@ -92,6 +92,82 @@ public sealed class WriteCommandTests : IDisposable
         var (staleExit, stale) = await RunAsync("update", "game.memory/save-slots-use-atomic-writes", "--base-revision", revision, "--title", "Lost update");
         Assert.Equal(4, staleExit);
         Assert.StartsWith("error revision_conflict", stale, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Knowledge_goes_to_the_user_library_and_memories_stay_in_the_project()
+    {
+        var user = Path.Combine(_workspace, "user");
+        var library = Directory.CreateDirectory(Path.Combine(_workspace, "library")).FullName;
+        File.WriteAllText(Path.Combine(library, "collection.json"),
+            """{ "schema": 1, "id": "library", "title": "Library", "defaults": { "applies": { "scope": "general" } } }""");
+        File.WriteAllText(Path.Combine(user, "config.json"), $$"""
+            {
+              "schema": 1,
+              "collections": {
+                "library": { "path": "{{library.Replace('\\', '/')}}", "capabilities": ["read", "maintain"] },
+                "game.memory": { "path": "{{Path.Combine(_project, ".agent-brain", "memory").Replace('\\', '/')}}", "capabilities": ["read"] }
+              },
+              "writes": { "knowledge": "library" }
+            }
+            """);
+
+        var (knowledgeExit, knowledge) = await RunAsync("new", "knowledge", "--title", "JsonUtility skips dictionaries", "--summary", "Wrap dictionaries in a serializable list.", "--tech", "unity");
+        Assert.Equal(0, knowledgeExit);
+        Assert.StartsWith("created library/jsonutility-skips-dictionaries", knowledge, StringComparison.Ordinal);
+        Assert.Contains("unity", File.ReadAllText(Path.Combine(library, "knowledge", "jsonutility-skips-dictionaries.md")), StringComparison.Ordinal);
+
+        // The project's own registration of game.memory wins over the read-only one in the user file.
+        var (memoryExit, memory) = await RunAsync("new", "memory", "--title", "Save slots are per profile", "--summary", "Each profile has its own slots.");
+        Assert.Equal(0, memoryExit);
+        Assert.StartsWith("created game.memory/", memory, StringComparison.Ordinal);
+
+        var (_, found) = await RunAsync("search", "save slots profile", "--format", "json");
+        Assert.Equal(1, found.Split("game.memory/save-slots-are-per-profile").Length - 1);
+    }
+
+    [Fact]
+    public async Task Collection_create_registers_a_library_that_promote_fills()
+    {
+        var library = Path.Combine(_workspace, "my-library");
+        var (createExit, created) = await RunAsync("collection", "create", "library", "--path", library, "--knowledge");
+        Assert.Equal(0, createExit);
+        Assert.Contains("collection 'library' (read, maintain), default for knowledge", created, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(library, "collection.json")));
+
+        await RunAsync("new", "memory", "--title", "JsonUtility drops dictionaries", "--summary", "Our save files lost dictionaries until we wrapped them.", "--file", "Assets/Save/*.cs");
+        var (promoteExit, promoted) = await RunAsync(
+            "promote", "game.memory/jsonutility-drops-dictionaries", "--summary", "JsonUtility cannot serialise dictionaries; wrap them in a list of pairs.", "--tech", "unity", "--supersede");
+        Assert.Equal(0, promoteExit);
+        Assert.StartsWith("promoted library/jsonutility-drops-dictionaries", promoted, StringComparison.Ordinal);
+        Assert.Contains("superseded game.memory/jsonutility-drops-dictionaries", promoted, StringComparison.Ordinal);
+
+        var copy = File.ReadAllText(Path.Combine(library, "knowledge", "jsonutility-drops-dictionaries.md"));
+        Assert.Contains("promoted from game.memory/jsonutility-drops-dictionaries", copy, StringComparison.Ordinal);
+        Assert.Contains("unity", copy, StringComparison.Ordinal);
+        Assert.DoesNotContain("Assets/Save", copy, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Collection_add_registers_another_projects_memory_read_only()
+    {
+        var other = Directory.CreateDirectory(Path.Combine(_workspace, "web-shop", ".agent-brain", "memory")).FullName;
+        File.WriteAllText(Path.Combine(other, "collection.json"),
+            """{ "schema": 1, "id": "web-shop.memory", "title": "Web shop memory", "defaults": { "applies": { "scope": "project", "projects": ["web-shop"] } } }""");
+        File.WriteAllText(Path.Combine(other, "cart.md"),
+            "---\nschema: 1\nid: cart\nkind: memory\ntitle: Cart totals are recomputed server-side\nsummary: Never trust client cart totals; recompute them from prices.\n---\nDetails.\n");
+
+        var (addExit, added) = await RunAsync("collection", "add", other);
+        Assert.Equal(0, addExit);
+        Assert.Contains("collection 'web-shop.memory' (read)", added, StringComparison.Ordinal);
+
+        var (_, collections) = await RunAsync("collections");
+        Assert.Contains("web-shop.memory", collections, StringComparison.Ordinal);
+
+        var (refusedExit, _) = await RunAsync("new", "memory", "--collection", "web-shop.memory", "--title", "Nope", "--summary", "Must not be written.");
+        Assert.NotEqual(0, refusedExit);
+
+        Assert.Equal(2, (await RunAsync("collection", "add", other, "--access", "read", "--knowledge")).Exit);
     }
 
     [Fact]
@@ -139,11 +215,12 @@ public sealed class WriteCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task Curated_collections_refuse_direct_writes_and_take_proposals()
+    public async Task Curated_collections_turn_saves_into_proposals()
     {
-        var (directExit, direct) = await RunAsync("new", "knowledge", "--collection", "team.kb", "--title", "Retry policy", "--summary", "Retry idempotent calls only.");
-        Assert.Equal(5, directExit);
-        Assert.Contains("Use brain propose", direct, StringComparison.Ordinal);
+        var (directExit, direct) = await RunAsync("new", "knowledge", "--collection", "team.kb", "--title", "Backoff policy", "--summary", "Back off exponentially with jitter.");
+        Assert.Equal(0, directExit);
+        Assert.StartsWith("proposed create team.kb/", direct, StringComparison.Ordinal);
+        Assert.Contains("nothing changes until a reviewer accepts it", direct, StringComparison.Ordinal);
 
         var (proposeExit, proposed) = await RunAsync("propose", "create", "--collection", "team.kb", "--title", "Retry policy", "--summary", "Retry idempotent calls only.", "--note", "From incident review");
         Assert.Equal(0, proposeExit);

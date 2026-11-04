@@ -5,6 +5,7 @@ using AgentBrain.Application.Authorization;
 using AgentBrain.Application.Common;
 using AgentBrain.Application.Operations.Maintenance;
 using AgentBrain.Application.Operations.Proposals;
+using AgentBrain.Application.Operations.Routing;
 using AgentBrain.Application.Writing;
 using AgentBrain.Cli.Infrastructure;
 using AgentBrain.Composition;
@@ -26,7 +27,7 @@ internal static class WriteCommands
     public static IEnumerable<Command> All(CliIo io) =>
     [
         Similar(io), New(io), Update(io), Lifecycle(io, "archive"), Lifecycle(io, "delete"), Link(io, "supersede"), Link(io, "resolve"),
-        Propose(io), Proposals(io), Publish(io), Batch(io),
+        Propose(io), Proposals(io), Publish(io), Promote(io), Batch(io),
     ];
 
     private static Command Similar(CliIo io)
@@ -34,7 +35,7 @@ internal static class WriteCommands
         var title = new Option<string>("--title") { Required = true, Description = "Title of the entry you are about to write." };
         var summary = new Option<string>("--summary") { Description = "Its summary." };
         var tags = DiscoveryCommands.Many("--tag", "Its tags.");
-        var collection = new Option<string?>("--collection") { Description = "Collection to check (default: writes.defaultCollection)." };
+        var collection = new Option<string?>("--collection") { Description = "Collection to check (default: writes.memory)." };
         var command = new Command("similar", "Find existing entries that may already cover what you are about to write.") { title, summary, tags, collection };
         command.SetAction((parse, ct) => CliContext.RunAsync(parse, io, async (runtime, renderer) =>
         {
@@ -54,10 +55,10 @@ internal static class WriteCommands
     {
         var kind = new Argument<string>("kind") { Description = $"Entry kind: {WireNames.Kinds.Joined}." };
         var options = new EntryOptions();
-        var collection = new Option<string?>("--collection") { Description = "Target collection (default: writes.defaultCollection)." };
+        var collection = new Option<string?>("--collection") { Description = "Target collection (default: writes.knowledge for knowledge, else writes.memory)." };
         var id = new Option<string?>("--id") { Description = "Entry ID (default: generated from the title)." };
         var blocking = new Option<bool>("--blocking") { Description = "Uncertainties only: guessing could cause harm, so agents must ask first." };
-        var command = new Command("new", "Create an entry in a project-memory collection you may maintain directly.") { kind, collection, id, blocking, options.AllowSecretRules };
+        var command = new Command("new", "Create an entry. Knowledge goes to writes.knowledge, other kinds to writes.memory; a collection that only takes proposals receives a proposal.") { kind, collection, id, blocking, options.Technologies, options.AllowSecretRules };
         foreach (var option in options.Content)
         {
             command.Options.Add(option);
@@ -72,8 +73,8 @@ internal static class WriteCommands
                 return CliContext.Fail(io, renderer, entry.Error ?? target.Error!);
             }
 
-            var result = await runtime.Maintenance.CreateAsync(Caller, target.Value, entry.Value, parse.GetValue(options.AllowSecretRules) ?? [], ct);
-            return Written(io, renderer, result, "created");
+            var result = await runtime.Writes.CreateAsync(Caller, target.Value, entry.Value, null, parse.GetValue(options.AllowSecretRules) ?? [], ct);
+            return Saved(io, renderer, result, "created");
         }, ct));
         return command;
     }
@@ -99,8 +100,8 @@ internal static class WriteCommands
                 return CliContext.Fail(io, renderer, target.Error ?? revision.Error ?? patch.Error!);
             }
 
-            var result = await runtime.Maintenance.UpdateAsync(Caller, target.Value, revision.Value, patch.Value, parse.GetValue(options.AllowSecretRules) ?? [], ct);
-            return Written(io, renderer, result, "updated");
+            var result = await runtime.Writes.ChangeAsync(Caller, MaintenanceAction.Update, target.Value, revision.Value, patch.Value, null, parse.GetValue(options.AllowSecretRules) ?? [], ct);
+            return Saved(io, renderer, result, "updated");
         }, ct));
         return command;
     }
@@ -122,9 +123,9 @@ internal static class WriteCommands
             }
 
             var result = name == "archive"
-                ? await runtime.Maintenance.ArchiveAsync(Caller, target.Value, revision.Value, ct)
-                : await runtime.Maintenance.DeleteAsync(Caller, target.Value, revision.Value, ct);
-            return Written(io, renderer, result, name == "archive" ? "archived" : "deleted");
+                ? await runtime.Writes.ChangeAsync(Caller, MaintenanceAction.Archive, target.Value, revision.Value, new EntryPatch { Archive = true }, null, [], ct)
+                : await runtime.Writes.DeleteAsync(Caller, target.Value, revision.Value, null, ct);
+            return Saved(io, renderer, result, name == "archive" ? "archived" : "deleted");
         }, ct));
         return command;
     }
@@ -148,9 +149,9 @@ internal static class WriteCommands
             }
 
             var result = name == "resolve"
-                ? await runtime.Maintenance.ResolveAsync(Caller, target.Value, link.Value, revision.Value, ct)
-                : await runtime.Maintenance.SupersedeAsync(Caller, target.Value, link.Value, revision.Value, ct);
-            return Written(io, renderer, result, name == "resolve" ? "resolved" : "superseded");
+                ? await runtime.Writes.ChangeAsync(Caller, MaintenanceAction.Resolve, target.Value, revision.Value, new EntryPatch { ResolvedBy = link.Value }, null, [], ct)
+                : await runtime.Writes.ChangeAsync(Caller, MaintenanceAction.Supersede, target.Value, revision.Value, new EntryPatch { SupersededBy = link.Value }, null, [], ct);
+            return Saved(io, renderer, result, name == "resolve" ? "resolved" : "superseded");
         }, ct));
         return command;
     }
@@ -189,7 +190,7 @@ internal static class WriteCommands
                 return CliContext.Fail(io, renderer, requests.Error);
             }
 
-            var result = await runtime.Publishing.PublishAsync(Caller, requests.Value, parse.GetValue(allow) ?? [], ct);
+            var result = await runtime.Writes.PublishAsync(Caller, requests.Value, parse.GetValue(allow) ?? [], ct);
             return result.IsSuccess ? CliContext.Write(io, WriteRendering.Published(result.Value, IsJson(renderer)), renderer) : CliContext.Fail(io, renderer, result.Error);
         }, ct));
         return command;
@@ -199,7 +200,7 @@ internal static class WriteCommands
     {
         var name = kind.ToString().ToLowerInvariant();
         var options = new EntryOptions();
-        var collection = new Option<string?>("--collection") { Description = "Target collection (create; default: writes.defaultCollection)." };
+        var collection = new Option<string?>("--collection") { Description = "Target collection (create; default: writes.knowledge for knowledge, else writes.memory)." };
         var entryKind = new Option<string>("--kind") { Description = $"Entry kind for create: {WireNames.Kinds.Joined}.", DefaultValueFactory = _ => "knowledge" };
         var id = new Option<string?>("--id") { Description = "Entry ID for create (default: from the title)." };
         var entry = new Argument<string?>("ref") { Description = "collection-id/entry-id (update and delete).", Arity = ArgumentArity.ZeroOrOne };
@@ -220,6 +221,11 @@ internal static class WriteCommands
             }
         }
 
+        if (kind == ChangeKind.Create)
+        {
+            command.Options.Add(options.Technologies);
+        }
+
         command.SetAction((parse, ct) => CliContext.RunAsync(parse, io, async (runtime, renderer) =>
         {
             var request = await BuildRequestAsync(parse, io, runtime, kind, options, collection, entryKind, id, entry, baseRevision, archive);
@@ -231,11 +237,11 @@ internal static class WriteCommands
             var allowed = parse.GetValue(options.AllowSecretRules) ?? [];
             if (publish)
             {
-                var published = await runtime.Publishing.PublishAsync(Caller, [request.Value], allowed, ct);
+                var published = await runtime.Writes.PublishAsync(Caller, [request.Value], allowed, ct);
                 return published.IsSuccess ? CliContext.Write(io, WriteRendering.Published(published.Value, IsJson(renderer)), renderer) : CliContext.Fail(io, renderer, published.Error);
             }
 
-            var proposal = await runtime.Proposals.SubmitAsync(Caller, request.Value, parse.GetValue(note), allowed, ct);
+            var proposal = await runtime.Writes.ProposeAsync(Caller, request.Value, parse.GetValue(note), allowed, ct);
             return proposal.IsSuccess ? CliContext.Write(io, WriteRendering.Proposals([proposal.Value], IsJson(renderer)), renderer) : CliContext.Fail(io, renderer, proposal.Error);
         }, ct));
         return command;
@@ -244,18 +250,19 @@ internal static class WriteCommands
     private static Command Proposals(CliIo io)
     {
         var status = new Option<string?>("--status") { Description = "pending, accepted or rejected." };
-        var list = new Command("list", "List proposals.") { status };
+        var list = new Command("list", "List proposals, local and on every connection. Remote IDs read connection:id.") { status };
         list.SetAction((parse, ct) => CliContext.RunAsync(parse, io, async (runtime, renderer) =>
         {
             ProposalStatus? filter = parse.GetValue(status) is { } s && Enum.TryParse<ProposalStatus>(s, true, out var parsed) ? parsed : null;
-            return CliContext.Write(io, WriteRendering.Proposals(await runtime.Proposals.ListAsync(filter, ct), IsJson(renderer)), renderer);
+            var listing = await runtime.Writes.ListProposalsAsync(filter, ct);
+            return CliContext.Write(io, WriteRendering.Proposals(listing.Proposals, IsJson(renderer), unavailable: listing.Unavailable), renderer);
         }, ct));
 
         var id = new Argument<string>("id");
         var show = new Command("show", "Show a proposal with its proposed content.") { id };
         show.SetAction((parse, ct) => CliContext.RunAsync(parse, io, async (runtime, renderer) =>
         {
-            var proposal = await runtime.Proposals.ShowAsync(parse.GetValue(id)!, ct);
+            var proposal = await runtime.Writes.ShowProposalAsync(parse.GetValue(id)!, ct);
             return proposal.IsSuccess ? CliContext.Write(io, WriteRendering.Proposals([proposal.Value], IsJson(renderer), withBody: true), renderer) : CliContext.Fail(io, renderer, proposal.Error);
         }, ct));
 
@@ -264,7 +271,7 @@ internal static class WriteCommands
         var accept = new Command("accept", "Apply a pending proposal (requires publish on the target).") { acceptId, note };
         accept.SetAction((parse, ct) => CliContext.RunAsync(parse, io, async (runtime, renderer) =>
         {
-            var result = await runtime.Proposals.AcceptAsync(Caller, parse.GetValue(acceptId)!, parse.GetValue(note), ct);
+            var result = await runtime.Writes.DecideAsync(Caller, parse.GetValue(acceptId)!, accept: true, parse.GetValue(note), ct);
             return result.IsSuccess ? CliContext.Write(io, WriteRendering.Proposals([result.Value], IsJson(renderer)), renderer) : CliContext.Fail(io, renderer, result.Error);
         }, ct));
 
@@ -273,11 +280,95 @@ internal static class WriteCommands
         var reject = new Command("reject", "Reject a pending proposal.") { rejectId, reason };
         reject.SetAction((parse, ct) => CliContext.RunAsync(parse, io, async (runtime, renderer) =>
         {
-            var result = await runtime.Proposals.RejectAsync(Caller, parse.GetValue(rejectId)!, parse.GetValue(reason), ct);
+            var result = await runtime.Writes.DecideAsync(Caller, parse.GetValue(rejectId)!, accept: false, parse.GetValue(reason), ct);
             return result.IsSuccess ? CliContext.Write(io, WriteRendering.Proposals([result.Value], IsJson(renderer)), renderer) : CliContext.Fail(io, renderer, result.Error);
         }, ct));
 
         return new Command("proposals", "Review proposals.") { list, show, accept, reject };
+    }
+
+    /// <summary>
+    /// Copies an entry into the knowledge collection as reusable knowledge. This is mechanical: it keeps the text and
+    /// drops project-specific files and symbols. Rewriting the text for general use is the agent's or your job
+    /// (pass --title, --summary or --body-file); the MCP prompt <c>promote</c> asks an agent to do that review.
+    /// </summary>
+    private static Command Promote(CliIo io)
+    {
+        var entry = new Argument<string>("ref") { Description = "The entry to promote, e.g. game.memory/jsonutility-dictionaries." };
+        var to = new Option<string?>("--to") { Description = "Target collection (default: writes.knowledge)." };
+        var options = new EntryOptions();
+        var supersede = new Option<bool>("--supersede") { Description = "Mark the original superseded by the copy (only when the copy is written, not proposed)." };
+        var command = new Command("promote", "Copy an entry into the knowledge collection as general knowledge, directly or as a proposal.")
+        {
+            entry, to, options.Title, options.Summary, options.Body, options.BodyFile, options.Tags, options.Technologies, supersede, options.AllowSecretRules,
+        };
+        command.SetAction((parse, ct) => CliContext.RunAsync(parse, io, async (runtime, renderer) =>
+        {
+            var source = EntryOptions.ParseRef(parse.GetValue(entry));
+            var target = ParseCollection(parse.GetValue(to));
+            if (!source.IsSuccess || !target.IsSuccess)
+            {
+                return CliContext.Fail(io, renderer, source.Error ?? target.Error!);
+            }
+
+            var destination = target.Value ?? runtime.Configuration.KnowledgeCollection;
+            if (destination is null)
+            {
+                return CliContext.Fail(io, renderer, Error.Validation("Give --to, or set writes.knowledge (brain collection create library --knowledge)."));
+            }
+
+            var fetched = await runtime.Get.ExecuteAsync([source.Value], null, false, ct);
+            if (!fetched.IsSuccess || fetched.Value.Entries.Count == 0)
+            {
+                return CliContext.Fail(io, renderer, fetched.IsSuccess ? fetched.Value.Failures[0].Error : fetched.Error);
+            }
+
+            var original = fetched.Value.Entries[0];
+            if (original.OmittedBytes > 0)
+            {
+                return CliContext.Fail(io, renderer, Error.Validation("The entry is larger than one get returns; pass --body-file with the text to promote."));
+            }
+
+            var body = await options.ReadBodyAsync(parse, io);
+            if (!body.IsSuccess)
+            {
+                return CliContext.Fail(io, renderer, body.Error);
+            }
+
+            var tags = parse.GetValue(options.Tags) is { Length: > 0 } given ? given : original.Entry.Tags;
+            var technologies = parse.GetValue(options.Technologies) is { Length: > 0 } t ? t : original.Entry.Applicability.Technologies;
+            var copy = new NewEntry(EntryKind.Knowledge, parse.GetValue(options.Title) ?? original.Entry.Title, parse.GetValue(options.Summary) ?? original.Entry.Summary, body.Value ?? original.Body)
+            {
+                Tags = tags,
+                Evidence = [$"promoted from {source.Value}"],
+                Applies = technologies.Count > 0 ? new ApplicabilityOverrides(Technologies: technologies) : null,
+            };
+
+            var saved = await runtime.Writes.CreateAsync(Caller, destination, copy, $"Promoted from {source.Value}", parse.GetValue(options.AllowSecretRules) ?? [], ct);
+            if (!saved.IsSuccess)
+            {
+                return CliContext.Fail(io, renderer, saved.Error);
+            }
+
+            var output = new System.Text.StringBuilder(WriteRendering.Saved(saved.Value, "promoted", IsJson(renderer)));
+            if (parse.GetValue(supersede) && saved.Value.Written is { } written)
+            {
+                var superseded = await runtime.Writes.ChangeAsync(
+                    Caller, MaintenanceAction.Supersede, source.Value, original.Entry.Revision, new EntryPatch { SupersededBy = written.Ref }, null, [], ct);
+                if (!superseded.IsSuccess)
+                {
+                    return CliContext.Fail(io, renderer, superseded.Error);
+                }
+
+                if (!IsJson(renderer))
+                {
+                    output.Append(WriteRendering.Saved(superseded.Value, "superseded", json: false));
+                }
+            }
+
+            return CliContext.Write(io, output.ToString(), renderer);
+        }, ct));
+        return command;
     }
 
     private static Command Batch(CliIo io)
@@ -327,15 +418,15 @@ internal static class WriteCommands
     {
         if (kind == ChangeKind.Create)
         {
-            var target = ParseCollection(parse.GetValue(collection)) is { IsSuccess: true } c ? c.Value ?? runtime.Configuration.DefaultWriteCollection : null;
-            if (target is null)
-            {
-                return Error.Validation("Give --collection (no writes.defaultCollection is configured).");
-            }
-
             if (!WireNames.Kinds.TryParse(parse.GetValue(entryKind), out var k))
             {
                 return Error.Validation($"--kind must be one of: {WireNames.Kinds.Joined}.");
+            }
+
+            var target = ParseCollection(parse.GetValue(collection)) is { IsSuccess: true } c ? c.Value ?? runtime.Writes.DefaultTarget(k) : null;
+            if (target is null)
+            {
+                return Error.Validation("Give --collection (no writes.knowledge or writes.memory is configured).");
             }
 
             EntryId? entryId = null;
@@ -414,6 +505,7 @@ internal static class WriteCommands
                 NewEntry = new NewEntry(entryKind, title, summary, Text("body") ?? "")
                 {
                     Id = id, Tags = List("tags") ?? [], Files = List("files") ?? [], Symbols = List("symbols") ?? [], Evidence = List("evidence") ?? [],
+                    Applies = List("technologies") is { Count: > 0 } technologies ? new ApplicabilityOverrides(Technologies: technologies) : null,
                 },
             };
         }
@@ -444,6 +536,6 @@ internal static class WriteCommands
 
     private static bool IsJson(Application.Abstractions.Support.IResponseRenderer renderer) => renderer is JsonRenderer;
 
-    private static int Written(CliIo io, Application.Abstractions.Support.IResponseRenderer renderer, Result<WriteResult> result, string action) =>
-        result.IsSuccess ? CliContext.Write(io, WriteRendering.Written(result.Value, action, IsJson(renderer)), renderer) : CliContext.Fail(io, renderer, result.Error);
+    private static int Saved(CliIo io, Application.Abstractions.Support.IResponseRenderer renderer, Result<SaveOutcome> result, string action) =>
+        result.IsSuccess ? CliContext.Write(io, WriteRendering.Saved(result.Value, action, IsJson(renderer)), renderer) : CliContext.Fail(io, renderer, result.Error);
 }

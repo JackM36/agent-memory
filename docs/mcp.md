@@ -23,11 +23,20 @@ Seven tools. Their definitions load into every agent session, so descriptions ar
 | `get` | Entries or sections by reference (`refs`, `withReferences`) | read-only |
 | `list` | Exact listing (`kinds`, `tags`, `blocking`, `cursor`) | read-only |
 | `relations` | Outgoing references or backlinks (`entry`, `backlinks`, `cursor`) | read-only |
-| `save` | Project memory: `create`, `update`, `archive`, `supersede`, `resolve` | write |
-| `propose` | Proposal to curated or read-only knowledge | write |
+| `save` | `create`, `update`, `archive`, `supersede`, `resolve`; `knowledge` goes to `writes.knowledge`, other kinds to project memory, `technologies` for technology-specific knowledge; becomes a proposal where the target only takes proposals | write |
+| `propose` | An explicit proposal (curated, read-only or remote collections) | write |
 | `publish` | Immediate publication where allowed | write, destructive |
 
 All tools return the compact text format described in [cli.md](cli.md). Deletion is CLI-only.
+
+Writes to collections on a connection go to that host, which applies the same validation, secret scan and
+revision checks.
+
+## Prompts
+
+| Prompt | Does |
+|---|---|
+| `promote` | Asks the agent to review project memory for lessons that hold in any project and save general versions as `knowledge` (project names, paths and class names removed). Started by the user, never automatically. |
 
 `publish` is its own tool so agent hosts can require confirmation for it by name. The agent guide also
 requires explicit user approval of the exact change before calling it.

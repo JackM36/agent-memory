@@ -64,7 +64,7 @@ public static class ConfigFileReader
                 kv.Value.Forward is { } fw ? new ForwardSettings(fw.Project, fw.Technologies, fw.Files, fw.Symbols) : null,
                 kv.Value.Enabled),
             StringComparer.Ordinal),
-        Writes = f.Writes is { } w ? new WritesSection(w.DefaultCollection) : null,
+        Writes = f.Writes is { } w ? new WritesSection(w.Memory, w.Knowledge) : null,
         SourcePreference = f.SourcePreference,
         Search = f.Search is { } s ? new SearchSection(s.Relaxation, s.MaxResults, s.MaxTokens, s.MaxBytes, s.CandidatesPerSource, s.Kinds, s.Log) : null,
         Get = f.Get is { } g ? new GetSection(g.MaxBytes, g.BatchTargets, g.BatchBytes) : null,

@@ -56,7 +56,9 @@ public sealed class GetOperation(EffectiveConfiguration configuration, Retrieval
             foreach (var provider in providers)
             {
                 result = await provider.GetAsync(new GetRequest(target, Math.Min(perEntry, remaining), withReferences), cancellationToken);
-                if (result.IsSuccess || result.Error.Code is not (ErrorCode.ProviderUnavailable or ErrorCode.Unauthorized))
+                // A source that serves "whatever its key reads" may simply not have it: try the next one.
+                var notHere = result.Error?.Code == ErrorCode.NotFound && provider.Collections.Count == 0;
+                if (result.IsSuccess || (!notHere && result.Error!.Code is not (ErrorCode.ProviderUnavailable or ErrorCode.Unauthorized)))
                 {
                     break;
                 }

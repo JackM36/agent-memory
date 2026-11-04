@@ -23,7 +23,7 @@ public sealed class ConfigFileTests
               "connections": {
                 "personal": { "url": "https://kb.example.com", "credentialEnv": "AGENT_BRAIN_PERSONAL_KEY", "forward": { "technologies": true } }
               },
-              "writes": { "defaultCollection": "space-game.memory" },
+              "writes": { "memory": "space-game.memory" },
               "search": { "relaxation": "broad", "maxResults": 8, "kinds": ["memory"] },
               "aliases": { "ecs": ["entity component system"] },
             }

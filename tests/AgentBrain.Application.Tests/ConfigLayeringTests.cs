@@ -130,7 +130,7 @@ public sealed class ConfigLayeringTests
 
         Assert.False(resolution.HasErrors, string.Join("; ", resolution.Diagnostics));
         Assert.Equal("space-game", resolution.Configuration.Project!.Id);
-        Assert.Null(resolution.Configuration.DefaultWriteCollection);
+        Assert.Null(resolution.Configuration.MemoryCollection);
         Assert.Equal(Path.Combine(ConfigDir, "local"), resolution.Configuration.RuntimeDirectory);
         Assert.Equal(5, resolution.Diagnostics.Count(d => d.Severity == IssueSeverity.Warning && d.Origin!.Level == ConfigLevel.User));
     }
@@ -169,7 +169,7 @@ public sealed class ConfigLayeringTests
         Assert.Equal(ConfigLevel.User, origins["aliases.ecs"].Level);
         Assert.EndsWith("config.json", origins["aliases.ecs"].FilePath, StringComparison.Ordinal);
         Assert.Equal(ConfigLevel.Project, origins["collections.space-game.memory"].Level);
-        Assert.Equal(ConfigLevel.Project, origins["writes.defaultCollection"].Level);
+        Assert.Equal(ConfigLevel.Project, origins["writes.memory"].Level);
         Assert.Equal(ConfigLevel.Project, origins["project.id"].Level);
     }
 
@@ -217,10 +217,61 @@ public sealed class ConfigLayeringTests
             Collections = new Dictionary<string, CollectionRegistration> { ["unity.kb"] = new("kb", ["read", "propose"]) },
             Writes = new WritesSection("unity.kb"),
         });
-        Assert.Contains(Resolve(readOnly).Diagnostics, d => d.Path == "writes.defaultCollection" && d.Severity == IssueSeverity.Error);
+        Assert.Contains(Resolve(readOnly).Diagnostics, d => d.Path == "writes.memory" && d.Severity == IssueSeverity.Error);
 
         var missing = ProjectFile(MinimalProject with { Writes = new WritesSection("nope") });
-        Assert.Contains(Resolve(missing).Diagnostics, d => d.Path == "writes.defaultCollection");
+        Assert.Contains(Resolve(missing).Diagnostics, d => d.Path == "writes.memory");
+    }
+
+    [Fact]
+    public void Knowledge_target_may_come_from_the_user_file_and_a_project_overrides_it()
+    {
+        var user = User(new ConfigDocument
+        {
+            Collections = new Dictionary<string, CollectionRegistration>
+            {
+                ["library"] = new("library", ["read", "maintain"]),
+                ["library.unity"] = new("library-unity", ["read", "propose"]),
+            },
+            Writes = new WritesSection(Memory: "library", Knowledge: "library"),
+        });
+
+        var inherited = Resolve(user, ProjectFile(MinimalProject));
+        Assert.Equal("library", inherited.Configuration.KnowledgeCollection?.Value);
+        Assert.Null(inherited.Configuration.MemoryCollection);
+        Assert.Contains(inherited.Diagnostics, d => d.Path == "writes.memory" && d.Severity == IssueSeverity.Warning);
+
+        var overridden = Resolve(user, ProjectFile(MinimalProject with { Writes = new WritesSection(Knowledge: "library.unity") })).Configuration;
+        Assert.Equal("library.unity", overridden.KnowledgeCollection?.Value);
+        Assert.Equal(ConfigLevel.Project, overridden.Origins["writes.knowledge"].Level);
+    }
+
+    [Fact]
+    public void Knowledge_target_must_be_writable_or_served_by_a_connection()
+    {
+        var readOnly = ProjectFile(MinimalProject with
+        {
+            Collections = new Dictionary<string, CollectionRegistration> { ["unity.kb"] = new("kb", ["read"]) },
+            Writes = new WritesSection(Knowledge: "unity.kb"),
+        });
+        Assert.Contains(Resolve(readOnly).Diagnostics, d => d.Path == "writes.knowledge" && d.Severity == IssueSeverity.Error);
+
+        var unknown = ProjectFile(MinimalProject with { Writes = new WritesSection(Knowledge: "library") });
+        Assert.Contains(Resolve(unknown).Diagnostics, d => d.Path == "writes.knowledge" && d.Severity == IssueSeverity.Error);
+
+        var listed = ProjectFile(MinimalProject with
+        {
+            Connections = new Dictionary<string, ConnectionDefinition> { ["personal"] = new("https://kb.example.com", "KEY", ["library"]) },
+            Writes = new WritesSection(Knowledge: "library"),
+        });
+        Assert.Equal("library", Resolve(listed).Configuration.KnowledgeCollection?.Value);
+
+        var everything = ProjectFile(MinimalProject with
+        {
+            Connections = new Dictionary<string, ConnectionDefinition> { ["personal"] = new("https://kb.example.com", "KEY") },
+            Writes = new WritesSection(Knowledge: "library"),
+        });
+        Assert.Equal("library", Resolve(everything).Configuration.KnowledgeCollection?.Value);
     }
 
     [Fact]

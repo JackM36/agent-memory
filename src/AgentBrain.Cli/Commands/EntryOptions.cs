@@ -27,6 +27,8 @@ internal sealed class EntryOptions
 
     public Option<string[]> Evidence { get; } = DiscoveryCommands.Many("--evidence", "Evidence: a path, a test, or 'user confirmed <date>'. Repeatable.");
 
+    public Option<string[]> Technologies { get; } = DiscoveryCommands.Many("--tech", "New entries: a technology the entry is specific to (e.g. unity). Repeatable; default: the collection's.");
+
     public Option<string[]> AllowSecretRules { get; } = DiscoveryCommands.Many("--allow-secret-rule", "Allow one secret-scan rule for this write, only after the user confirmed a false positive.");
 
     public IEnumerable<Option> Content => [Title, Summary, Body, BodyFile, Tags, Files, Symbols, Evidence];
@@ -78,6 +80,7 @@ internal sealed class EntryOptions
             Symbols = parse.GetValue(Symbols) ?? [],
             Evidence = parse.GetValue(Evidence) ?? [],
             Blocking = blocking,
+            Applies = parse.GetValue(Technologies) is { Length: > 0 } technologies ? new ApplicabilityOverrides(Technologies: technologies) : null,
         };
     }
 

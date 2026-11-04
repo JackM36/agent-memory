@@ -6,11 +6,17 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using AgentBrain.Application.Abstractions.Providers;
 using AgentBrain.Application.Common;
+using AgentBrain.Application.Abstractions.Proposals;
 using AgentBrain.Application.Configuration;
+using AgentBrain.Application.Operations.Maintenance;
+using AgentBrain.Application.Operations.Proposals;
+using AgentBrain.Application.Operations.Publishing;
+using AgentBrain.Application.Operations.Routing;
 using AgentBrain.Application.Retrieval;
 using AgentBrain.Contracts.V1;
 using AgentBrain.Domain.Access;
 using AgentBrain.Domain.Identity;
+using AgentBrain.Domain.Revisions;
 
 namespace AgentBrain.Infrastructure.Http;
 
@@ -19,13 +25,18 @@ namespace AgentBrain.Infrastructure.Http;
 /// collections and never forwards. Only the context the connection allows is sent. The API key comes from
 /// the environment variable named in configuration and is never logged or included in errors.
 /// </summary>
-public sealed class RemoteHttpProvider : IKnowledgeProvider, IDisposable
+public sealed class RemoteHttpProvider : IKnowledgeProvider, IRemoteWriteTarget, IDisposable
 {
+    /// <summary>Writes wait longer than searches: the host validates, scans and may write a file.</summary>
+    private static readonly TimeSpan MinimumWriteTimeout = TimeSpan.FromSeconds(30);
+
     public const string ProtocolHeader = ProtocolVersions.Header;
 
     private readonly HttpClient _http;
     private readonly EffectiveConnection _connection;
     private readonly string? _projectId;
+    private readonly SemaphoreSlim _describeLock = new(1, 1);
+    private Dictionary<CollectionId, CollectionInfo>? _described;
 
     public RemoteHttpProvider(EffectiveConnection connection, string apiKey, string? projectId, HttpMessageHandler? handler = null)
     {
@@ -44,7 +55,11 @@ public sealed class RemoteHttpProvider : IKnowledgeProvider, IDisposable
 
     public IReadOnlyList<CollectionInfo> Collections { get; }
 
-    public void Dispose() => _http.Dispose();
+    public void Dispose()
+    {
+        _http.Dispose();
+        _describeLock.Dispose();
+    }
 
     public async ValueTask<Result<ProviderSearchResult>> SearchAsync(SearchRequest request, CancellationToken cancellationToken)
     {
@@ -167,6 +182,152 @@ public sealed class RemoteHttpProvider : IKnowledgeProvider, IDisposable
     {
         var response = await GetJsonAsync("v1/collections", ContractsJsonContext.Default.CollectionsResponseDto, cancellationToken);
         return response.IsSuccess ? Result<IReadOnlyList<CollectionDto>>.Success(response.Value.Collections) : response.Error;
+    }
+
+    // ---- Writes (IRemoteWriteTarget) ----
+
+    public bool MayServe(CollectionId collection) => _connection.Collections.Count == 0 || _connection.Collections.Contains(collection);
+
+    /// <summary>Asks the host once per process which collections this key reads and what it may do there.</summary>
+    public async ValueTask<Result<CollectionInfo>> DescribeAsync(CollectionId collection, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(collection);
+        await _describeLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_described is null)
+            {
+                var response = await TimedAsync(DescribeAsync, cancellationToken);
+                if (!response.IsSuccess)
+                {
+                    return response.Error;
+                }
+
+                _described = response.Value
+                    .Select(c => RequestMapper.ToCollectionInfo(c, SourceId))
+                    .OfType<CollectionInfo>()
+                    .ToDictionary(c => c.Id);
+            }
+        }
+        finally
+        {
+            _describeLock.Release();
+        }
+
+        return MayServe(collection) && _described.TryGetValue(collection, out var info)
+            ? info
+            : Error.NotFound($"{SourceId} does not serve collection '{collection}' to this key.");
+    }
+
+    public ValueTask<Result<WriteResult>> CreateAsync(ChangeRequest request, IReadOnlyCollection<string> allowedSecretRules, CancellationToken cancellationToken) =>
+        WriteAsync(HttpMethod.Post, "v1/entries", RequestMapper.FromChangeRequest(request, null, allowedSecretRules), cancellationToken);
+
+    public ValueTask<Result<WriteResult>> MaintainAsync(MaintenanceAction action, ChangeRequest request, IReadOnlyCollection<string> allowedSecretRules, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var entry = $"v1/entries/{request.Collection}/{request.Entry}";
+        var dto = RequestMapper.FromChangeRequest(request, null, allowedSecretRules);
+        return action switch
+        {
+            MaintenanceAction.Archive => WriteAsync(HttpMethod.Post, entry + "/archive", dto, cancellationToken),
+            MaintenanceAction.Supersede => WriteAsync(HttpMethod.Post, entry + "/supersede", dto, cancellationToken),
+            MaintenanceAction.Resolve => WriteAsync(HttpMethod.Post, entry + "/resolve", dto, cancellationToken),
+            _ => WriteAsync(HttpMethod.Put, entry, dto, cancellationToken),
+        };
+    }
+
+    public async ValueTask<Result<WriteResult>> DeleteAsync(EntryRef target, Revision baseRevision, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(baseRevision);
+        var path = $"v1/entries/{target.Collection}/{target.Entry}?baseRevision={Uri.EscapeDataString(baseRevision.Value)}";
+        var response = await TimedAsync(ct => SendAsync<string, WriteResponseDto>(HttpMethod.Delete, path, null, null, ContractsJsonContext.Default.WriteResponseDto, ct), cancellationToken);
+        return response.IsSuccess ? RequestMapper.ToWriteResult(response.Value) : response.Error;
+    }
+
+    public async ValueTask<Result<ProposalView>> ProposeAsync(ChangeRequest request, string? note, IReadOnlyCollection<string> allowedSecretRules, CancellationToken cancellationToken)
+    {
+        var dto = RequestMapper.FromChangeRequest(request, note, allowedSecretRules);
+        return Single(await TimedAsync(
+            ct => SendAsync(HttpMethod.Post, "v1/proposals", dto, ContractsJsonContext.Default.ChangeRequestDto, ContractsJsonContext.Default.ProposalsResponseDto, ct),
+            cancellationToken));
+    }
+
+    public async ValueTask<Result<IReadOnlyList<PublishedChange>>> PublishAsync(IReadOnlyList<ChangeRequest> requests, IReadOnlyCollection<string> allowedSecretRules, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+        var dto = new PublishRequestDto([.. requests.Select(r => RequestMapper.FromChangeRequest(r, null, allowedSecretRules))]);
+        var response = await TimedAsync(
+            ct => SendAsync(HttpMethod.Post, "v1/publish", dto, ContractsJsonContext.Default.PublishRequestDto, ContractsJsonContext.Default.PublishResponseDto, ct),
+            cancellationToken);
+        return response.IsSuccess ? Result<IReadOnlyList<PublishedChange>>.Success(RequestMapper.ToPublished(response.Value)) : response.Error;
+    }
+
+    public async ValueTask<Result<IReadOnlyList<ProposalView>>> ListProposalsAsync(ProposalStatus? status, CancellationToken cancellationToken)
+    {
+        var path = status is { } s ? "v1/proposals?status=" + s.ToString().ToLowerInvariant() : "v1/proposals";
+        var response = await TimedAsync(ct => GetJsonAsync(path, ContractsJsonContext.Default.ProposalsResponseDto, ct), cancellationToken);
+        if (!response.IsSuccess)
+        {
+            return response.Error;
+        }
+
+        var views = new List<ProposalView>();
+        foreach (var dto in response.Value.Proposals)
+        {
+            var view = RequestMapper.ToProposalView(dto, SourceId);
+            if (!view.IsSuccess)
+            {
+                return view.Error;
+            }
+
+            views.Add(view.Value);
+        }
+
+        return views;
+    }
+
+    public async ValueTask<Result<ProposalView>> ShowProposalAsync(string id, CancellationToken cancellationToken) =>
+        Single(await TimedAsync(ct => GetJsonAsync($"v1/proposals/{Uri.EscapeDataString(id)}", ContractsJsonContext.Default.ProposalsResponseDto, ct), cancellationToken));
+
+    public async ValueTask<Result<ProposalView>> DecideAsync(string id, bool accept, string? note, CancellationToken cancellationToken)
+    {
+        var path = $"v1/proposals/{Uri.EscapeDataString(id)}/{(accept ? "accept" : "reject")}";
+        return Single(await TimedAsync(
+            ct => SendAsync(HttpMethod.Post, path, new DecisionDto(note), ContractsJsonContext.Default.DecisionDto, ContractsJsonContext.Default.ProposalsResponseDto, ct),
+            cancellationToken));
+    }
+
+    private async ValueTask<Result<WriteResult>> WriteAsync(HttpMethod method, string path, ChangeRequestDto dto, CancellationToken cancellationToken)
+    {
+        var response = await TimedAsync(
+            ct => SendAsync(method, path, dto, ContractsJsonContext.Default.ChangeRequestDto, ContractsJsonContext.Default.WriteResponseDto, ct),
+            cancellationToken);
+        return response.IsSuccess ? RequestMapper.ToWriteResult(response.Value) : response.Error;
+    }
+
+    private Result<ProposalView> Single(Result<ProposalsResponseDto> response) =>
+        !response.IsSuccess ? response.Error
+        : response.Value.Proposals.Count == 1 ? RequestMapper.ToProposalView(response.Value.Proposals[0], SourceId)
+        : new Error(ErrorCode.ProviderUnavailable, $"{SourceId} returned {response.Value.Proposals.Count} proposals where one was expected.");
+
+    /// <summary>
+    /// Runs a non-search call under its own deadline. Searches are timed by the coordinator instead; writes and
+    /// reviews have no coordinator, so an expired deadline becomes an error here rather than an exception.
+    /// </summary>
+    private async ValueTask<Result<T>> TimedAsync<T>(Func<CancellationToken, ValueTask<Result<T>>> call, CancellationToken cancellationToken)
+    {
+        var limit = _connection.Timeout > MinimumWriteTimeout ? _connection.Timeout : MinimumWriteTimeout;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        linked.CancelAfter(limit);
+        try
+        {
+            return await call(linked.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return new Error(ErrorCode.ProviderUnavailable, $"{SourceId} did not answer within {limit.TotalSeconds:0} seconds. The change may or may not have been applied; check before retrying.");
+        }
     }
 
     private ValueTask<Result<TResponse>> GetJsonAsync<TResponse>(string path, JsonTypeInfo<TResponse> responseType, CancellationToken cancellationToken) =>

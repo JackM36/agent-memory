@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using AgentBrain.Application.Common;
 using AgentBrain.Application.Configuration;
@@ -83,6 +84,62 @@ public static class HostConfigFile
             file.Limits?.MaxResults ?? HostConfiguration.DefaultMaxResults,
             file.Limits?.MaxBytes ?? HostConfiguration.DefaultMaxBytes,
             file.AllowInsecureHttp ?? false);
+    }
+
+    /// <summary>
+    /// Adds a hosted collection to host.json text (<c>brain-server collections add</c>). Comments are not kept; the
+    /// result is re-parsed, so an addition that would make the file invalid is refused instead of written.
+    /// </summary>
+    public static Result<string> AddCollection(string json, string filePath, HostedCollection collection)
+    {
+        ArgumentNullException.ThrowIfNull(collection);
+        JsonObject root;
+        try
+        {
+            root = JsonNode.Parse(json, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) as JsonObject
+                ?? throw new JsonException("not an object");
+        }
+        catch (JsonException ex)
+        {
+            return new Error(ErrorCode.ConfigInvalid, $"{filePath}: {ex.Message}");
+        }
+
+        var collections = root["collections"] as JsonObject ?? [];
+        root["collections"] = collections;
+        if (collections.ContainsKey(collection.Id.Value))
+        {
+            return Error.Validation($"Collection '{collection.Id}' is already hosted.");
+        }
+
+        var entry = new JsonObject
+        {
+            ["title"] = collection.Title,
+            ["storage"] = collection.Storage == HostStorage.Markdown ? "markdown" : "sqlite",
+        };
+        if (collection.Path is not null)
+        {
+            entry["path"] = collection.Path;
+        }
+
+        entry["scope"] = "general";
+        if (collection.Defaults.Technologies is { Count: > 0 } technologies)
+        {
+            entry["technologies"] = new JsonArray([.. technologies.Select(t => (JsonNode)t)]);
+        }
+
+        entry["readOnly"] = collection.ReadOnly;
+        entry["immediatePublish"] = collection.ImmediatePublish;
+        collections[collection.Id.Value] = entry;
+
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+        {
+            root.WriteTo(writer);
+        }
+
+        var text = System.Text.Encoding.UTF8.GetString(stream.ToArray()) + "\n";
+        var check = Parse(text, filePath);
+        return check.IsSuccess ? text : check.Error;
     }
 
     /// <summary>The host.json <c>brain-server init</c> writes: one SQLite collection, behind a proxy.</summary>

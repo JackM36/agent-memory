@@ -4,6 +4,7 @@ using AgentBrain.Infrastructure.Local.Logging;
 using AgentBrain.Infrastructure.Local.Records;
 using AgentBrain.Application.Capture;
 using AgentBrain.Application.Operations.Maintenance;
+using AgentBrain.Application.Operations.Routing;
 using AgentBrain.Application.Operations.Proposals;
 using AgentBrain.Application.Operations.Publishing;
 using AgentBrain.Application.Writing;
@@ -77,6 +78,8 @@ public sealed class BrainRuntime : IDisposable
         Proposals = new ProposalOperation(parts.Catalog, preparer, new FileProposalStore(parts.ProposalsDirectory), parts.Audit, freshness, time);
         Publishing = new PublishOperation(parts.Catalog, preparer, new FileBatchJournal(Path.Combine(parts.StateDirectory, "batches")), parts.Audit, freshness, time);
         Catalog = parts.Catalog;
+        Writes = new WriteRouter(parts.Configuration, parts.Catalog, Maintenance, Proposals, Publishing,
+            [.. parts.Coordinator.Providers.OfType<IRemoteWriteTarget>()]);
     }
 
     public EffectiveConfiguration Configuration { get; }
@@ -101,6 +104,9 @@ public sealed class BrainRuntime : IDisposable
     public PublishOperation Publishing { get; }
 
     public CollectionCatalog Catalog { get; }
+
+    /// <summary>Every client-side write (CLI and MCP): picks the destination and saves directly or as a proposal.</summary>
+    public WriteRouter Writes { get; }
 
     public void Dispose()
     {

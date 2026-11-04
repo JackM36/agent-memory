@@ -33,17 +33,24 @@ collection for this call only). Run `brain <command> --help` for every option.
 are not history: include them with `--kind report` / `--kind note`. `--explain` prints the evidence behind
 every rank.
 
-## Writing project memory
+## Writing
 
 | Command | Purpose |
 |---|---|
 | `brain similar --title … [--summary …] [--tag …]` | Existing entries that may already cover it |
-| `brain new <kind> --title … --summary … [--body … \| --body-file path\|-] [--tag t] [--file glob] [--symbol s] [--evidence e] [--id id] [--blocking] [--collection c]` | Create |
+| `brain new <kind> --title … --summary … [--body … \| --body-file path\|-] [--tag t] [--file glob] [--symbol s] [--evidence e] [--tech t] [--id id] [--blocking] [--collection c]` | Create |
 | `brain update <ref> --base-revision r1-… [same content options]` | Change only the given fields |
 | `brain archive <ref> --base-revision …` | Retire from default search |
 | `brain supersede <ref> --by <ref> --base-revision …` | Point to a replacement |
 | `brain resolve <uncertainty> --by <memory> --base-revision …` | Answer a question |
 | `brain delete <ref> --base-revision …` | Delete (prefer archive) |
+| `brain promote <ref> [--to c] [--title …] [--summary …] [--body-file …] [--tech t] [--supersede]` | Copy an entry into the knowledge collection as general knowledge |
+
+**Where writes go.** Without `--collection`, `knowledge` goes to `writes.knowledge` and every other kind to
+`writes.memory`. Local or remote, the destination decides how: with `maintain` the entry is written; with
+only `propose` the command records a proposal instead and says so (exit 0). Read-only collections refuse.
+`promote` copies the text as it is and drops files and symbols; pass `--title`, `--summary` or `--body-file`
+to generalise it. `--supersede` marks the original superseded by the copy when the copy was written.
 
 Get the base revision from `brain get <ref> --format json` (`entries[0].entry.rev`). A secret in the
 content fails with exit 8; `--allow-secret-rule <rule>` allows one rule for one write, only after the
@@ -54,7 +61,7 @@ user confirms a false positive.
 | Command | Purpose |
 |---|---|
 | `brain propose create\|update\|delete …` | Record a proposed change; nothing changes yet |
-| `brain proposals list [--status pending\|accepted\|rejected]` / `show <id>` | Review |
+| `brain proposals list [--status pending\|accepted\|rejected]` / `show <id>` | Review: local proposals and those on every connection; remote IDs read `connection:id` |
 | `brain proposals accept <id> [--note …]` / `reject <id> [--reason …]` | Decide (accept needs `publish`) |
 | `brain publish create\|update\|delete …` | Apply immediately (only where `immediatePublish` is on) |
 | `brain publish --batch changes.json` | Several changes to one collection together |
@@ -81,5 +88,7 @@ Batch file:
 | `brain index status\|reindex\|verify\|reset` | Inspect or rebuild the index |
 | `brain config show [--origin]` / `config validate` | Effective configuration and where each value came from |
 | `brain connection add <name> --url … --credential-env VAR [--collections a,b] [--project]` / `connection test <name>` | Register a remote host |
+| `brain collection create <id> [--path dir] [--title …] [--tech t] [--review] [--knowledge] [--project]` | Create a general-knowledge collection folder and register it (user file by default; `--review` makes saves proposals; `--knowledge` sets `writes.knowledge`) |
+| `brain collection add <path> [--access read\|review\|maintain] [--knowledge] [--project]` | Register an existing collection, e.g. another project's memory for cross-project search (read-only by default) |
 | `brain mcp` | MCP server on stdin/stdout |
 | `brain hook stop --host claude\|codex` | Stop-hook entry point (installed by `init`) |

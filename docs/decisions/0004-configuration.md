@@ -36,7 +36,7 @@ working directory). Every effective value records its origin.
   Per-connection `forward` settings still apply when it is true, and default to all false.
 - **Capabilities default to `["read"]`.** A registration listing capabilities without `read` gets
   `read` added with a warning, because an unreadable collection cannot be searched.
-- **`writes.defaultCollection` must name a configured collection with `maintain`.** Otherwise it is
+- **`writes.memory` must name a configured collection with `maintain`.** Otherwise it is
   an error; the destination is never inferred.
 - **Connection URLs** must be absolute `https`, or `http` on a loopback address.
 - **Out-of-range numbers** are errors; the effective value is clamped only so the rest of the

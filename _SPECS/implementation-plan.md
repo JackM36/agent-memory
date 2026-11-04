@@ -17,6 +17,7 @@ The product is named **Agent Brain**. The spec's "knowledge and memory tool" is 
 | 4 — Replace the legacy scaffold | Built; **dogfood gate skipped at the owner's request** | Legacy scaffold removed, README and docs rewritten; `tools/LegacyImport` kept until the owner confirms all projects are imported |
 | 5 — Remote host, federation, deployment | Built; exit gate open (live Droplet used from two projects); Docker image not built locally (no daemon) | [ADR 0007](../docs/decisions/0007-writes-remote-and-hardening.md), [deployment.md](../docs/deployment.md), [http-api.md](../docs/http-api.md) |
 | 6 — Hardening, packaging, documentation | Built; release workflow not yet run | Security tests, `.github/workflows/release.yml`, measurements in ADR 0007 |
+| Follow-up — shared knowledge | Built | Knowledge routing (`writes.memory` / `writes.knowledge`), remote writes, collection commands, `promote`: [ADR 0008](../docs/decisions/0008-knowledge-routing-and-remote-writes.md) |
 
 Phases 3–6 were built in one pass without stopping at the gates ("finish all phases first before we test anything"). Owner testing is the next step.
 
@@ -33,6 +34,7 @@ Deviations from this plan, each recorded in an ADR:
 - Phase 4: the dogfood period and its go/no-go for Phase 5 were skipped at the owner's request; its calibration output is still open (ADR 0007).
 - Phase 5: server proposals, batch journal and audit are files under the data directory, not database tables; action routes use path segments (`/archive`) instead of `:archive`; `allowInsecureHttp` is a `host.json` setting, not a flag; `local` transport uses ordinary keys, without a generated local key; collection aliases stay global (ADR 0007).
 - Phase 6: MCP tool definitions are about 1,440 tokens for all seven tools, about 20% over the ~1,200 target, after schema compaction (ADR 0007).
+- Follow-up: `writes.defaultCollection` became `writes.memory` plus `writes.knowledge` (the latter allowed in the user file); saves route by kind and become proposals where the target only takes proposals; clients write to remote collections (ADR 0008).
 
 | Thing | Name |
 |---|---|

@@ -56,7 +56,7 @@ public sealed record ConnectionDefinition(
 
 public sealed record ForwardSettings(bool? Project = null, bool? Technologies = null, bool? Files = null, bool? Symbols = null);
 
-public sealed record WritesSection(string? DefaultCollection = null);
+public sealed record WritesSection(string? Memory = null, string? Knowledge = null);
 
 public sealed record SearchSection(
     string? Relaxation = null,

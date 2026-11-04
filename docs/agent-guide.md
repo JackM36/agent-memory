@@ -30,7 +30,7 @@ Saving is housekeeping: do not list it as a step in plans, and mention what you 
 | Content | Kind |
 |---|---|
 | Resolved fact, gotcha, decision, navigation hint | `memory` |
-| Reusable practice for any project | `knowledge` (curated collections: propose) |
+| Reusable practice for any project | `knowledge` |
 | Unresolved question or risky assumption | `uncertainty` (`blocking` if guessing could cause harm) |
 | Investigation or validation detail Git does not keep | `report` |
 | Not classifiable yet | `note` |
@@ -48,10 +48,26 @@ rejected; fetch again and re-apply.
 **Resolving questions.** When the user answers an uncertainty, save the answer as a memory, then
 `save` with action `resolve` (`brain resolve <question> --by <memory>`). It stops blocking.
 
-## Curated knowledge
+## Where saves go
 
-Collections without direct maintenance take proposals (`propose`, `brain propose`). Nothing changes
-until a reviewer accepts.
+- `knowledge` goes to the knowledge collection (`writes.knowledge`, for example a personal `library`, local
+  or on a server). Every other kind goes to project memory (`writes.memory`). Pass a collection only to
+  override that.
+- The destination decides how: a collection you may maintain is written directly; one that only takes
+  proposals turns the save into a proposal, and nothing changes until the user accepts it. Mention that in
+  one line; it is not an error.
+- **A lesson that would help in other projects gets two entries.** The project `memory` keeps the concrete
+  details (files, classes, the incident). A separate `knowledge` entry states the lesson in general terms:
+  no project names, paths, class names or ticket numbers. Set `technologies` when it is specific to some
+  (for example `unity`). Never move project details into a general collection.
+- When asked to review a project for general lessons, use the `promote` prompt (or `brain promote <ref>`
+  to copy one entry as it is).
+
+## Proposals and publishing
+
+`propose` (`brain propose`) suggests a change explicitly, for example to read-only package knowledge.
+Nothing changes until a reviewer accepts. Proposals on a server are listed and decided with their
+connection prefix: `brain proposals accept personal:p-…`.
 
 `publish` applies a change immediately and only works where the collection enables it. Use it only
 after:

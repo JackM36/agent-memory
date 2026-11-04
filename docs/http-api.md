@@ -99,11 +99,14 @@ Maintenance, proposals and publish batches all use one shape:
   "kind": "update", "collection": "team", "entry": "retry-policy", "baseRevision": "…",
   "entryKind": "knowledge", "title": "…", "summary": "…", "body": "…",
   "tags": [], "files": [], "symbols": [], "evidence": [],
-  "archive": false, "supersededBy": null, "resolvedBy": null, "blocking": false, "note": "why"
+  "archive": false, "supersededBy": null, "resolvedBy": null, "blocking": false, "note": "why",
+  "technologies": ["unity"], "allowSecretRules": []
 }
 ```
 
-Omitted fields in an update keep their current value. Bodies are scanned for secrets before anything is
+Omitted fields in an update keep their current value. `technologies` applies to creates: the entry is
+specific to those technologies instead of the collection default. `allowSecretRules` lets one secret-scan
+rule pass for this change, only after a person confirmed a false positive (the CLI's `--allow-secret-rule`). Bodies are scanned for secrets before anything is
 stored (`422 secret_detected`). A create also runs the similar-entry check and lists likely duplicates
 in its response (`similar`), so the client can merge or archive one.
 

@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Globalization;
+using AgentBrain.Application.Configuration;
 using AgentBrain.Composition;
 using AgentBrain.Infrastructure.Local.Configuration;
 using AgentBrain.Server;
@@ -132,7 +133,99 @@ health.SetAction(async (parse, ct) =>
     }
 });
 
+var newId = new Argument<string>("id") { Description = "Collection ID, e.g. library or library.unity." };
+var newTitle = new Option<string?>("--title") { Description = "Title (default: from the ID)." };
+var storage = new Option<string>("--storage") { Description = "sqlite (default) or markdown.", DefaultValueFactory = _ => "sqlite" };
+var folder = new Option<string?>("--path") { Description = "Markdown: folder under the data directory (default: collections/<id>). Created with a collection.json if missing." };
+var technologies = new Option<string[]>("--tech") { Description = "Technology every entry applies to by default. Repeatable.", AllowMultipleArgumentsPerToken = false };
+var readOnly = new Option<bool>("--read-only") { Description = "Nobody can write it through the API." };
+var immediate = new Option<bool>("--immediate-publish") { Description = "Allow publishing without review for keys with publish." };
+var addCollection = new Command("add", "Host another collection. Restart the server to serve it.") { newId, newTitle, storage, folder, technologies, readOnly, immediate };
+addCollection.SetAction(async (parse, ct) =>
+{
+    var directory = Path.GetFullPath(parse.GetValue(data)!);
+    var hostFile = Path.Combine(directory, HostConfigFile.FileName);
+    if (!AgentBrain.Domain.Identity.CollectionId.TryParse(parse.GetValue(newId), out var id))
+    {
+        Console.Error.WriteLine($"'{parse.GetValue(newId)}' is not a valid collection ID (lowercase words joined by '-' or '.').");
+        return 2;
+    }
+
+    if (!File.Exists(hostFile))
+    {
+        Console.Error.WriteLine($"{hostFile} does not exist; run brain-server init first.");
+        return 2;
+    }
+
+    var markdown = parse.GetValue(storage) switch
+    {
+        "sqlite" => false,
+        "markdown" => true,
+        _ => (bool?)null,
+    };
+    if (markdown is null)
+    {
+        Console.Error.WriteLine("--storage must be sqlite or markdown.");
+        return 2;
+    }
+
+    var title = parse.GetValue(newTitle) ?? CollectionDescriptorFile.TitleFrom(id.Value);
+    var techs = parse.GetValue(technologies) ?? [];
+    var relative = markdown.Value ? (parse.GetValue(folder) ?? Path.Combine("collections", id.Value)).Replace('\\', '/') : null;
+    var hosted = new HostedCollection(
+        id, markdown.Value ? HostStorage.Markdown : HostStorage.Sqlite, relative, title,
+        new AgentBrain.Domain.Entries.ApplicabilityOverrides(AgentBrain.Domain.Entries.ApplicabilityScope.General, null, techs),
+        AgentBrain.Domain.Entries.ProvenanceSource.Curated, parse.GetValue(readOnly), parse.GetValue(immediate));
+    var updated = HostConfigFile.AddCollection(await File.ReadAllTextAsync(hostFile, ct), hostFile, hosted);
+    if (!updated.IsSuccess)
+    {
+        Console.Error.WriteLine(updated.Error.Message);
+        return 2;
+    }
+
+    if (relative is not null)
+    {
+        var root = Path.GetFullPath(relative, directory);
+        var descriptor = Path.Combine(root, CollectionDescriptorFile.FileName);
+        if (!File.Exists(descriptor))
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(descriptor, CollectionDescriptorFile.Create(id.Value, title, techs, parse.GetValue(readOnly)), ct);
+            Console.WriteLine($"created {descriptor}");
+        }
+        else if (CollectionDescriptorFile.ReadId(descriptor) != id.Value)
+        {
+            Console.Error.WriteLine($"{descriptor} describes a different collection.");
+            return 2;
+        }
+    }
+
+    await File.WriteAllTextAsync(hostFile, updated.Value, ct);
+    Console.WriteLine($"updated {hostFile}: collection '{id}' ({(markdown.Value ? "markdown " + relative : "sqlite")}). Restart the server to serve it.");
+    Console.WriteLine($"Keys with collection:*:<capability> scopes reach it already; others need e.g. keys create --scope collection:{id}:read.");
+    return 0;
+});
+
+var listCollections = new Command("list", "List hosted collections.");
+listCollections.SetAction(parse =>
+{
+    var configuration = HostRuntime.ReadConfiguration(Path.GetFullPath(parse.GetValue(data)!));
+    if (!configuration.IsSuccess)
+    {
+        Console.Error.WriteLine(configuration.Error.Message);
+        return 2;
+    }
+
+    foreach (var c in configuration.Value.Collections)
+    {
+        Console.WriteLine($"{c.Id}  {c.Storage.ToString().ToLowerInvariant()}{(c.Path is null ? "" : " " + c.Path)}{(c.ReadOnly ? "  read-only" : "")}{(c.ImmediatePublish ? "  immediate-publish" : "")}  {c.Title}");
+    }
+
+    return 0;
+});
+
 root.Subcommands.Add(init);
+root.Subcommands.Add(new Command("collections", "Manage hosted collections.") { addCollection, listCollections });
 root.Subcommands.Add(run);
 root.Subcommands.Add(new Command("keys", "Manage API keys.") { create, list, revoke });
 root.Subcommands.Add(backup);

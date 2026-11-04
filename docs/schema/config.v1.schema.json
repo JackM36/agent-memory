@@ -75,10 +75,11 @@
     },
     "writes": {
       "type": "object",
-      "description": "Project files only.",
+      "description": "Where saves go by default. memory is project-only; knowledge may also be set in the user file.",
       "additionalProperties": false,
       "properties": {
-        "defaultCollection": { "$ref": "#/$defs/identifier" }
+        "memory": { "$ref": "#/$defs/identifier", "description": "Project memory: memories, uncertainties, reports and notes. Needs maintain." },
+        "knowledge": { "$ref": "#/$defs/identifier", "description": "Reusable knowledge. A local collection with maintain or propose, or a collection served by a connection." }
       }
     },
     "sourcePreference": {

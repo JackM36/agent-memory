@@ -86,18 +86,35 @@ project id and technologies, which improves ranking of project-scoped entries on
 symbols are opt-in in the same way. See [configuration.md](configuration.md) for `sourcePreference`,
 timeouts and per-connection collection lists.
 
+### 6. Save to the server
+
+To make the server's collection the default destination for reusable knowledge, set it in your user
+configuration (`%APPDATA%\agent-brain\config.json` or `~/.config/agent-brain/config.json`):
+
+```json
+{ "schema": 1, "writes": { "knowledge": "personal" } }
+```
+
+From then on, `brain new knowledge …` and the agents' `save` with kind `knowledge` write to the server;
+project memories stay in each repository. What the key may do decides how a save lands: with
+`maintain` it is written, with only `propose` it becomes a proposal, which you review from any machine
+with `brain proposals list` and `brain proposals accept personal:p-…` (needs `publish`).
+
 ### Adding collections
 
-Edit `host.json` in the volume, then restart. The runtime image is chiseled and has no shell, so edit
-the file from a helper container:
-
 ```bash
-docker run --rm -it -v deploy_brain-data:/data alpine vi /data/host.json
+docker compose exec brain-server /app/brain-server collections add library.unity --tech unity
+docker compose exec brain-server /app/brain-server collections list
 docker compose restart brain-server
 ```
 
-A SQLite collection needs only `{ "title": "…", "storage": "sqlite" }`. A Markdown collection needs
-`"storage": "markdown", "path": "<directory under /data>"`. Markdown collections are watched and
+`collections add <id>` adds a SQLite collection to `host.json`. Options: `--storage markdown` (a folder
+under `/data`, default `collections/<id>`, created with a `collection.json`), `--path`, `--title`, `--tech`
+(default technologies of its entries), `--read-only` and `--immediate-publish`. Keys with
+`collection:*:…` scopes reach the new collection at once; others need a key that names it.
+
+One server hosts any number of collections behind one URL. A client connection without a collection
+list sees every collection its key can read, so new collections need no client change. Markdown collections are watched and
 reindexed when files change, with a full reconciliation every five minutes.
 
 ## Keys

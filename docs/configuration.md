@@ -27,7 +27,8 @@ connections apply.
 | Single values (limits, relaxation, timeouts) | The highest level that sets one wins |
 | `collections`, `connections` | Merged by name; a higher level replaces a same-named entry whole; `"enabled": false` removes it |
 | `aliases` | Union by term; the higher level wins a term |
-| `project`, `writes`, `runtimeDir`, `proposals`, `inheritUser` | Project files only; ignored with a warning in the user file |
+| `project`, `writes.memory`, `runtimeDir`, `proposals`, `inheritUser` | Project files only; ignored with a warning in the user file |
+| `writes.knowledge` | Any level; the highest wins, so a project can override the user default |
 | `inheritUser: false` | Ignore the user file entirely |
 
 Relative paths resolve against the directory of the file that declares them.
@@ -42,7 +43,7 @@ Relative paths resolve against the directory of the file that declares them.
     "space-game.memory": { "path": "memory", "capabilities": ["read", "maintain"] },
     "unity.kb": { "path": "../Packages/com.me.kb/Knowledge~", "capabilities": ["read", "propose"] }
   },
-  "writes": { "defaultCollection": "space-game.memory" },
+  "writes": { "memory": "space-game.memory", "knowledge": "library" },
   "sourcePreference": ["space-game.memory", "unity.kb", "personal"],
   "search": { "relaxation": "default", "maxResults": 10, "maxTokens": 1000, "kinds": ["knowledge", "memory", "uncertainty"], "log": false }
 }
@@ -65,6 +66,37 @@ Relative paths resolve against the directory of the file that declares them.
 ```
 
 `brain connection add` writes this for you.
+
+## Example: user (a personal library and other projects' memory)
+
+```jsonc
+{
+  "schema": 1,
+  "collections": {
+    "library":         { "path": "C:/Users/me/agent-brain/library", "capabilities": ["read", "maintain"] },
+    "library.unity":   { "path": "C:/Users/me/agent-brain/library.unity", "capabilities": ["read", "propose", "publish"] },
+    "web-shop.memory": { "path": "C:/code/web-shop/.agent-brain/memory", "capabilities": ["read"] }
+  },
+  "writes": { "knowledge": "library" }
+}
+```
+
+`brain collection create library --knowledge` and `brain collection add <path>` write these entries.
+Every project now searches the library and the other project's memory; knowledge is saved to `library`
+directly, and `library.unity` only takes proposals, which you accept with `brain proposals accept`. A
+project that registers its own memory under the same name keeps its own registration, so it stays
+writable there.
+
+## Where saves go
+
+| Kind | Default destination | Set by |
+|---|---|---|
+| `knowledge` | `writes.knowledge`, else `writes.memory` | User file or project (the project wins) |
+| `memory`, `uncertainty`, `report`, `note` | `writes.memory` | Project only (`brain init`) |
+
+The destination may be a local collection or one served by a connection. Its capabilities decide how a
+save lands: `maintain` writes directly, `propose` alone turns the save into a proposal, neither refuses.
+For a connection, those are the capabilities the host grants the key.
 
 ## Capabilities
 

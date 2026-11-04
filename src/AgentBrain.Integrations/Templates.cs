@@ -6,9 +6,9 @@ namespace AgentBrain.Integrations;
 /// </summary>
 public static class Templates
 {
-    public const int IntegrationVersion = 1;
-    public const string VersionMarker = "agent-brain-integration: 1";
-    public const string SectionBegin = "<!-- agent-brain:begin v1 -->";
+    public const int IntegrationVersion = 2;
+    public const string VersionMarker = "agent-brain-integration: 2";
+    public const string SectionBegin = "<!-- agent-brain:begin v2 -->";
     public const string SectionEnd = "<!-- agent-brain:end -->";
     public const string McpServerName = "agent-brain";
 
@@ -26,12 +26,17 @@ public static class Templates
           (`OTHER PROJECT`) describe that project; check before applying them here.
         - Results may be **partial** when a source is unavailable; say so if it matters.
         - **After work that created durable knowledge** (a decision, a user-confirmed fact, a gotcha, how a
-          system works), save it to project memory (`save`, or `brain new`). Search first and update an existing
-          entry instead of duplicating. Skip trivial edits. Saving is housekeeping: never list it as a plan step.
+          system works), save it (`save`, or `brain new`). Search first and update an existing entry instead of
+          duplicating. Skip trivial edits. Saving is housekeeping: never list it as a plan step.
+        - Facts about this codebase are `memory`; they go to project memory. A lesson that holds in any project is
+          `knowledge`: save a separate general version (no project names, paths or class names; set
+          `technologies` if it is specific to some) and keep the project memory with the concrete details.
+          Knowledge goes to the configured knowledge collection; where that collection takes proposals, the save
+          becomes a proposal for the user to accept.
         - Save a `memory` only when the user confirmed it, files you inspected prove it, or tests support it.
           Otherwise save an `uncertainty` (mark it blocking if guessing could cause harm). Never save secrets.
-        - Curated knowledge changes go through `propose`. Use `publish` only after showing the user the exact
-          change and getting explicit approval; silence is not approval. Ask again if the change differs.
+        - `propose` suggests a change explicitly. Use `publish` only after showing the user the exact change and
+          getting explicit approval; silence is not approval. Ask again if the change differs.
         {{SectionEnd}}
         """;
 
@@ -67,14 +72,21 @@ public static class Templates
           entries: update one of those instead of duplicating (`save` action `update` with its `baseRevision`).
         - Kinds: `memory` (resolved fact or decision), `knowledge` (reusable practice), `uncertainty` (open
           question; `blocking` if guessing could cause harm), `report` (investigation detail not in Git), `note`.
+        - Where it goes: `knowledge` goes to the knowledge collection (for example a personal `library`, local or
+          on a server); every other kind goes to project memory. Pass `collection` only to override that.
+        - A lesson that would help in other projects deserves two entries: the project `memory` with the concrete
+          details, and a general `knowledge` entry with no project names, paths or class names. Set
+          `technologies` (for example `unity`) when it only applies there.
+        - If the destination only takes proposals, `save` returns a proposal: nothing changes until the user
+          accepts it. That is expected; mention it in one line.
         - Save a memory only with evidence: user confirmation, inspected files, or tests. Never save guesses or
           secrets. Summaries are one line; they are what search shows.
         - When the user answers an uncertainty: save the answer as a memory, then `save` action `resolve`.
         - Do not list saving as a step in plans; mention what you saved in one line.
 
-        ## Curated knowledge
+        ## Proposals and publishing
 
-        Collections without direct maintenance take `propose`. `publish` applies a change immediately and is
+        `propose` suggests a change explicitly, for example to read-only package knowledge. `publish` applies a change immediately and is
         allowed only after showing the user the exact change and receiving explicit approval. Silence or an
         unrelated answer is not approval. If the change differs from what was approved, ask again.
         """;
@@ -87,7 +99,7 @@ public static class Templates
           "collections": {
             "{{projectId}}.memory": { "path": "memory", "capabilities": ["read", "maintain"] }
           },
-          "writes": { "defaultCollection": "{{projectId}}.memory" }
+          "writes": { "memory": "{{projectId}}.memory" }
         }
 
         """;

@@ -29,13 +29,21 @@ public sealed class RetrievalCoordinator
     /// <summary>The preferred provider for a collection: source preference first, then local before remote.</summary>
     public IKnowledgeProvider? ProviderFor(CollectionId collection) => ProvidersFor(collection) is { Count: > 0 } providers ? providers[0] : null;
 
-    /// <summary>Every provider serving a collection, in preference order (for fallback when one is unavailable).</summary>
+    /// <summary>
+    /// Every provider serving a collection, in preference order (for fallback when one is unavailable). Remote
+    /// sources that list no collections serve whatever their key reads; they come last, and answer not-found
+    /// for collections they do not have.
+    /// </summary>
     public IReadOnlyList<IKnowledgeProvider> ProvidersFor(CollectionId collection) =>
     [
         .. Providers
             .Where(p => p.Collections.Any(c => c.Id == collection))
             .OrderBy(p => PreferenceRank(p.SourceId, collection))
             .ThenBy(p => p.SourceId == LocalKnowledgeProvider.Id ? 0 : 1)
+            .ThenBy(p => p.SourceId, StringComparer.Ordinal),
+        .. Providers
+            .Where(p => p.Collections.Count == 0 && p.SourceId != LocalKnowledgeProvider.Id)
+            .OrderBy(p => PreferenceRank(p.SourceId, collection))
             .ThenBy(p => p.SourceId, StringComparer.Ordinal),
     ];
 

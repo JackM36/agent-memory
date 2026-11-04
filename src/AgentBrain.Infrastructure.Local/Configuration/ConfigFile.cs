@@ -86,7 +86,9 @@ internal sealed class ForwardFile
 
 internal sealed class WritesFile
 {
-    public string? DefaultCollection { get; set; }
+    public string? Memory { get; set; }
+
+    public string? Knowledge { get; set; }
 }
 
 internal sealed class SearchFile

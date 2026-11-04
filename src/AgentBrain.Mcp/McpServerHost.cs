@@ -26,7 +26,8 @@ public static class McpServerHost
             .AddMcpServer(options => options.ServerInfo = new() { Name = ServerName, Version = typeof(McpServerHost).Assembly.GetName().Version?.ToString(3) ?? "0.0.0" })
             .WithStdioServerTransport()
             .WithTools<BrainTools>(McpJsonContext.Default.Options)
-            .WithTools<BrainWriteTools>(McpJsonContext.Default.Options);
+            .WithTools<BrainWriteTools>(McpJsonContext.Default.Options)
+            .WithPrompts<BrainPrompts>(McpJsonContext.Default.Options);
         builder.Services.PostConfigure<McpServerOptions>(ToolSchemaCompactor.Compact);
         await builder.Build().RunAsync(cancellationToken);
     }

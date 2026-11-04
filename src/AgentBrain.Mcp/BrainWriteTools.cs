@@ -2,6 +2,7 @@ using System.ComponentModel;
 using AgentBrain.Application.Authorization;
 using AgentBrain.Application.Common;
 using AgentBrain.Application.Operations.Proposals;
+using AgentBrain.Application.Operations.Routing;
 using AgentBrain.Application.Writing;
 using AgentBrain.Composition;
 using AgentBrain.Contracts.Rendering;
@@ -13,8 +14,9 @@ using ModelContextProtocol.Server;
 namespace AgentBrain.Mcp;
 
 /// <summary>
-/// MCP write tools (plan §7.3). <c>save</c> maintains project memory directly; <c>propose</c> records changes to
-/// curated collections; <c>publish</c> applies them immediately and is a separate, destructive-marked tool so
+/// MCP write tools (plan §7.3), all routed through <see cref="WriteRouter"/>. <c>save</c> writes to project memory or
+/// the knowledge collection, local or remote, and becomes a proposal where the target only takes proposals;
+/// <c>propose</c> records changes to curated collections explicitly; <c>publish</c> applies them immediately and is a separate, destructive-marked tool so
 /// hosts can gate it by name on top of the explicit-approval rule in the agent guide. Deletion is CLI-only.
 /// </summary>
 [McpServerToolType]
@@ -23,7 +25,7 @@ public sealed class BrainWriteTools(BrainRuntime runtime)
     private static readonly CallerContext Caller = CallerContext.Local("mcp");
 
     [McpServerTool(Name = "save", ReadOnly = false, Destructive = false, OpenWorld = false)]
-    [Description("Save durable project knowledge to project memory: action create, update, archive, supersede or resolve. Search first and update an existing entry rather than duplicating. Never save secrets or guesses.")]
+    [Description("Save durable knowledge: action create, update, archive, supersede or resolve. Kind knowledge (reusable in any project, no project details) goes to the knowledge collection; other kinds go to project memory. A collection that only takes proposals turns the save into a proposal. Search first; update rather than duplicate. Never save secrets or guesses.")]
     public async Task<string> SaveAsync(
         [Description("create, update, archive, supersede or resolve.")] string action,
         [Description("update/archive/supersede/resolve: collection/entry.")] string? entry = null,
@@ -38,10 +40,10 @@ public sealed class BrainWriteTools(BrainRuntime runtime)
         [Description("Paths, tests or 'user confirmed <date>'.")] string[]? evidence = null,
         [Description("create uncertainty: guessing could cause harm.")] bool blocking = false,
         [Description("supersede: the replacement; resolve: the answering memory.")] string? by = null,
-        [Description("create: target collection (default: the project's).")] string? collection = null,
+        [Description("create knowledge: technologies it is specific to, e.g. unity.")] string[]? technologies = null,
+        [Description("create: target collection, only to override the default.")] string? collection = null,
         CancellationToken cancellationToken = default)
     {
-        Result<Application.Operations.Maintenance.WriteResult> result;
         switch (action)
         {
             case "create":
@@ -59,9 +61,9 @@ public sealed class BrainWriteTools(BrainRuntime runtime)
                 var newEntry = new NewEntry(entryKind, title, summary, body ?? "")
                 {
                     Tags = tags ?? [], Files = files ?? [], Symbols = symbols ?? [], Evidence = evidence ?? [], Blocking = blocking,
+                    Applies = technologies is { Length: > 0 } ? new ApplicabilityOverrides(Technologies: technologies) : null,
                 };
-                result = await runtime.Maintenance.CreateAsync(Caller, target, newEntry, [], cancellationToken);
-                return Written(result, "created");
+                return Saved(await runtime.Writes.CreateAsync(Caller, target, newEntry, null, [], cancellationToken), "created");
 
             case "update" or "archive" or "supersede" or "resolve":
                 if (!EntryRef.TryParse(entry, out var reference) || !Revision.TryParse(baseRevision, out var revision))
@@ -75,17 +77,14 @@ public sealed class BrainWriteTools(BrainRuntime runtime)
                     return Render(Error.Validation($"{action} needs by (collection/entry)."));
                 }
 
-                result = action switch
+                var (maintenanceAction, patch) = action switch
                 {
-                    "archive" => await runtime.Maintenance.ArchiveAsync(Caller, reference, revision, cancellationToken),
-                    "supersede" => await runtime.Maintenance.SupersedeAsync(Caller, reference, link!, revision, cancellationToken),
-                    "resolve" => await runtime.Maintenance.ResolveAsync(Caller, reference, link!, revision, cancellationToken),
-                    _ => await runtime.Maintenance.UpdateAsync(
-                        Caller, reference, revision,
-                        new EntryPatch { Title = title, Summary = summary, Body = body, Tags = tags, Files = files, Symbols = symbols, Evidence = evidence },
-                        [], cancellationToken),
+                    "archive" => (MaintenanceAction.Archive, new EntryPatch { Archive = true }),
+                    "supersede" => (MaintenanceAction.Supersede, new EntryPatch { SupersededBy = link!.WithoutAnchor() }),
+                    "resolve" => (MaintenanceAction.Resolve, new EntryPatch { ResolvedBy = link!.WithoutAnchor() }),
+                    _ => (MaintenanceAction.Update, new EntryPatch { Title = title, Summary = summary, Body = body, Tags = tags, Files = files, Symbols = symbols, Evidence = evidence }),
                 };
-                return Written(result, action + "d");
+                return Saved(await runtime.Writes.ChangeAsync(Caller, maintenanceAction, reference, revision, patch, null, [], cancellationToken), action + "d");
 
             default:
                 return Render(Error.Validation("action must be create, update, archive, supersede or resolve."));
@@ -112,7 +111,7 @@ public sealed class BrainWriteTools(BrainRuntime runtime)
             return Render(request.Error);
         }
 
-        var proposal = await runtime.Proposals.SubmitAsync(Caller, request.Value, note, [], cancellationToken);
+        var proposal = await runtime.Writes.ProposeAsync(Caller, request.Value, note, [], cancellationToken);
         return proposal.IsSuccess ? WriteRendering.Proposals([proposal.Value], json: false) : Render(proposal.Error);
     }
 
@@ -135,7 +134,7 @@ public sealed class BrainWriteTools(BrainRuntime runtime)
             return Render(request.Error);
         }
 
-        var published = await runtime.Publishing.PublishAsync(Caller, [request.Value], [], cancellationToken);
+        var published = await runtime.Writes.PublishAsync(Caller, [request.Value], [], cancellationToken);
         return published.IsSuccess ? WriteRendering.Published(published.Value, json: false) : Render(published.Error);
     }
 
@@ -165,8 +164,8 @@ public sealed class BrainWriteTools(BrainRuntime runtime)
         return changeKind == ChangeKind.Delete ? request : request with { Patch = new EntryPatch { Title = title, Summary = summary, Body = body, Tags = tags } };
     }
 
-    private static string Written(Result<Application.Operations.Maintenance.WriteResult> result, string action) =>
-        result.IsSuccess ? WriteRendering.Written(result.Value, action, json: false) : Render(result.Error);
+    private static string Saved(Result<SaveOutcome> result, string action) =>
+        result.IsSuccess ? WriteRendering.Saved(result.Value, action, json: false) : Render(result.Error);
 
     private static string Render(Error error) => TextRenderer.Compact.RenderError(error);
 }

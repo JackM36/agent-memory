@@ -90,4 +90,31 @@ public sealed class CoordinatorTests
 
         Assert.Equal(SourceState.Unauthorized, Assert.Single(outcome.Sources).State);
     }
+
+    /// <summary>A remote source whose connection lists no collections: it serves whatever its key reads.</summary>
+    private sealed class OpenRemote(string id) : IKnowledgeProvider
+    {
+        public string SourceId => id;
+
+        public IReadOnlyList<CollectionInfo> Collections { get; } = [];
+
+        public ValueTask<Result<ProviderSearchResult>> SearchAsync(SearchRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<Result<Page<RankedEntry>>> ListAsync(ListRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<Result<EntryContent>> GetAsync(GetRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<Result<IReadOnlyList<OutgoingReference>>> ReferencesAsync(EntryRef entry, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<Result<Page<Backlink>>> BacklinksAsync(EntryRef entry, string? cursor, int pageSize, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public void Open_remote_sources_serve_unlisted_collections_after_the_ones_that_list_them()
+    {
+        var coordinator = new RetrievalCoordinator([(Returning("local"), null), (new OpenRemote("personal"), null), (Returning("library"), null)]);
+
+        Assert.Equal(["library", "personal"], coordinator.ProvidersFor(CollectionId.Parse("library")).Select(p => p.SourceId));
+        Assert.Equal(["personal"], coordinator.ProvidersFor(CollectionId.Parse("elsewhere")).Select(p => p.SourceId));
+    }
 }

@@ -250,12 +250,13 @@ internal static class Endpoints
         var caller = Http.Caller(context);
         var maintenance = Runtime(context).Maintenance;
         var r = request.Value;
+        var allow = (IReadOnlyCollection<string>?)change.AllowSecretRules ?? [];
         var target = r.Entry is null ? null : new EntryRef(r.Collection, r.Entry);
         Result<WriteResult> result = action switch
         {
-            "create" => await maintenance.CreateAsync(caller, r.Collection, r.NewEntry!, [], context.RequestAborted),
+            "create" => await maintenance.CreateAsync(caller, r.Collection, r.NewEntry!, allow, context.RequestAborted),
             "resolve" when r.Patch?.ResolvedBy is { } answer => await maintenance.ResolveAsync(caller, target!, answer, r.BaseRevision!, context.RequestAborted),
-            _ => await maintenance.UpdateAsync(caller, target!, r.BaseRevision!, r.Patch!, [], context.RequestAborted),
+            _ => await maintenance.UpdateAsync(caller, target!, r.BaseRevision!, r.Patch!, allow, context.RequestAborted),
         };
         await (result.IsSuccess
             ? Http.WriteJsonAsync(context, WriteRendering.Written(result.Value, action, json: true), action == "create" ? StatusCodes.Status201Created : StatusCodes.Status200OK)
@@ -299,7 +300,7 @@ internal static class Endpoints
             return;
         }
 
-        var proposal = await runtime.Proposals.SubmitAsync(caller, request.Value, dto.Value.Note, [], context.RequestAborted);
+        var proposal = await runtime.Proposals.SubmitAsync(caller, request.Value, dto.Value.Note, (IReadOnlyCollection<string>?)dto.Value.AllowSecretRules ?? [], context.RequestAborted);
         await (proposal.IsSuccess
             ? Http.WriteJsonAsync(context, WriteRendering.Proposals([proposal.Value], json: true), StatusCodes.Status201Created)
             : Http.WriteErrorAsync(context, proposal.Error));
@@ -360,7 +361,7 @@ internal static class Endpoints
             requests.Add(request.Value);
         }
 
-        var result = await Runtime(context).Publishing.PublishAsync(Http.Caller(context), requests, [], context.RequestAborted);
+        var result = await Runtime(context).Publishing.PublishAsync(Http.Caller(context), requests, [.. dto.Value.Changes.SelectMany(c => c.AllowSecretRules ?? []).Distinct(StringComparer.Ordinal)], context.RequestAborted);
         await (result.IsSuccess ? Http.WriteJsonAsync(context, WriteRendering.Published(result.Value, json: true)) : Http.WriteErrorAsync(context, result.Error));
     }
 
