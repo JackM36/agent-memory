@@ -5,6 +5,9 @@
     <PublishAot>true</PublishAot>
   </PropertyGroup>
   <ItemGroup>
+    <AssemblyMetadata Include="AgentBrainRepository" Value="$(AgentBrainRepository)" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../../src/AgentBrain.Composition/AgentBrain.Composition.csproj" />
     <ProjectReference Include="../../src/AgentBrain.Contracts/AgentBrain.Contracts.csproj" />
     <ProjectReference Include="../../src/AgentBrain.Mcp/AgentBrain.Mcp.csproj" />

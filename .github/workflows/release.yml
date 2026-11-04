@@ -1,34 +1,114 @@
-name: release
+name: Release
 
-# Push a tag such as v1.0.0 to build and publish a release (plan §9.7).
+# Runs on every push to main (a squash-merged PR). semantic-release reads the Conventional Commit titles since
+# the last tag and decides the next version; when nothing releasable merged (docs, chore, ci, test…), the
+# workflow stops after planning. Otherwise it verifies, builds every platform and the server image for that
+# version, then tags, publishes the GitHub release with notes and assets, and promotes the image to latest.
 on:
   push:
-    tags: ["v*"]
+    branches:
+      - main
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.repository }}-main
+  cancel-in-progress: false
+
 jobs:
+  plan:
+    name: Plan release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      has_release: ${{ steps.plan.outputs.has_release }}
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      - name: Calculate semantic release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          rm -f release-plan.json
+          npx --no-install semantic-release --dry-run
+
+      - name: Export release plan
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! -f release-plan.json ]]; then
+            echo "has_release=false" >> "$GITHUB_OUTPUT"
+            echo "No releasable changes found."
+            exit 0
+          fi
+
+          version="$(node -p "require('./release-plan.json').version")"
+          tag="$(node -p "require('./release-plan.json').tag")"
+          {
+            echo "has_release=true"
+            echo "version=${version}"
+            echo "tag=${tag}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Next release: ${tag}"
+
   verify:
+    name: Release verification
+    if: ${{ needs.plan.outputs.has_release == 'true' }}
+    needs: plan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
-      - run: dotnet build AgentBrain.slnx -c Release
-      - run: dotnet test --solution AgentBrain.slnx -c Release --no-build
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      - name: Test release configuration
+        run: npm test
+
+      - name: Build (warnings are errors)
+        run: dotnet build AgentBrain.slnx -c Release
+
+      - name: Test
+        run: dotnet test --solution AgentBrain.slnx -c Release --no-build
+
       - name: Retrieval evaluation gate
         run: dotnet run --project eval/AgentBrain.Evaluation -c Release --no-build -- --phase 5 --min-pass 0.85 --max-irrelevant 0
 
   binaries:
-    needs: verify
-    name: binaries (${{ matrix.rid }})
+    name: Binaries (${{ matrix.rid }})
+    needs: [plan, verify]
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
-          # Native AOT cannot cross-compile between operating systems, and Linux arm64 needs an arm64 runner.
+          # Native AOT cannot cross-compile between operating systems, and arm64 needs arm64 runners.
           - { os: windows-latest, rid: win-x64 }
           - { os: windows-11-arm, rid: win-arm64 }
           - { os: macos-latest, rid: osx-arm64 }
@@ -36,91 +116,171 @@ jobs:
           - { os: ubuntu-latest, rid: linux-x64 }
           - { os: ubuntu-24.04-arm, rid: linux-arm64 }
     runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
       - name: Publish brain (Native AOT)
-        run: dotnet publish src/AgentBrain.Cli -c Release -r ${{ matrix.rid }} -o out/brain
+        shell: bash
+        run: >
+          dotnet publish src/AgentBrain.Cli -c Release -r ${{ matrix.rid }} -o out/brain
+          -p:Version=${VERSION} -p:AgentBrainRepository=${{ github.repository }}
 
       - name: Publish brain-server (self-contained)
-        run: dotnet publish src/AgentBrain.Server -c Release -r ${{ matrix.rid }} --self-contained -p:PublishSingleFile=true -o out/brain-server
+        shell: bash
+        run: >
+          dotnet publish src/AgentBrain.Server -c Release -r ${{ matrix.rid }} --self-contained -p:PublishSingleFile=true -o out/brain-server
+          -p:Version=${VERSION}
 
       - name: Smoke test
         shell: bash
         run: |
-          ./out/brain/brain --version
-          ./out/brain-server/brain-server --help
+          set -euo pipefail
+          reported="$(./out/brain/brain --version)"
+          echo "brain --version: ${reported}"
+          [[ "${reported}" == "${VERSION}"* ]] || { echo "::error::brain reports ${reported}, expected ${VERSION}"; exit 1; }
+          ./out/brain-server/brain-server --help > /dev/null
 
       - name: Archive
+        # Asset names carry no version, so releases/latest/download/<name> is a stable URL for the install scripts
+        # and brain update.
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          set -euo pipefail
           mkdir -p dist
           for tool in brain brain-server; do
-            name="$tool-$version-${{ matrix.rid }}"
-            rm -f out/$tool/*.pdb out/$tool/*.dbg
+            find "out/${tool}" \( -name '*.pdb' -o -name '*.dbg' -o -name '*.dSYM' \) -prune -exec rm -rf {} +
+            name="${tool}-${{ matrix.rid }}"
             if [[ "${{ matrix.rid }}" == win-* ]]; then
-              (cd out/$tool && 7z a -tzip "../../dist/$name.zip" . > /dev/null)
+              (cd "out/${tool}" && 7z a -tzip "../../dist/${name}.zip" . > /dev/null)
             else
-              tar -C out/$tool -czf "dist/$name.tar.gz" .
+              tar -C "out/${tool}" -czf "dist/${name}.tar.gz" .
             fi
           done
+          ls -l dist
 
       - uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.rid }}
           path: dist/*
-
-  publish-release:
-    needs: binaries
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: dist-*
-          merge-multiple: true
-          path: dist
-      - name: Checksums
-        run: cd dist && sha256sum * > SHA256SUMS
-      - name: Create the GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "Agent Brain $GITHUB_REF_NAME" \
-            --notes "Binaries are not code-signed. Verify downloads against SHA256SUMS. See docs/deployment.md for the server image."
+          retention-days: 7
 
   image:
-    needs: verify
+    name: Server image
+    needs: [plan, verify]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      image: ${{ steps.names.outputs.image }}
+      digest: ${{ steps.build.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
+      - name: Image name
+        id: names
+        shell: bash
+        # GHCR names must be lowercase; repository owners may not be.
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/agent-brain-server" >> "$GITHUB_OUTPUT"
+
       - uses: docker/setup-qemu-action@v3
+
       - uses: docker/setup-buildx-action@v3
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository_owner }}/agent-brain-server
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest
-      - uses: docker/build-push-action@v6
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: deploy/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.plan.outputs.version }}
+          tags: |
+            ${{ steps.names.outputs.image }}:${{ needs.plan.outputs.version }}
+            ${{ steps.names.outputs.image }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.plan.outputs.version }}
+          cache-from: type=gha,scope=release-server
+          cache-to: type=gha,mode=max,scope=release-server
+
+  publish:
+    name: Publish release
+    needs: [plan, binaries, image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum *.zip *.tar.gz > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Publish GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx --no-install semantic-release
+
+      - name: Verify published tag
+        env:
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          tag_sha="$(git rev-list -n 1 "${RELEASE_TAG}")"
+          if [[ "${tag_sha}" != "${GITHUB_SHA}" ]]; then
+            echo "::error::${RELEASE_TAG} points to ${tag_sha}, expected ${GITHUB_SHA}."
+            exit 1
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote the verified image to latest
+        env:
+          IMAGE: ${{ needs.image.outputs.image }}
+          DIGEST: ${{ needs.image.outputs.digest }}
+        run: docker buildx imagetools create --tag "${IMAGE}:latest" "${IMAGE}@${DIGEST}"

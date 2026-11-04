@@ -15,3 +15,8 @@ TestResults/
 .agent-brain/local/
 # Agent Brain server environment
 deploy/.env
+
+# Release tooling (npm) and release outputs
+node_modules/
+release-plan.json
+dist/

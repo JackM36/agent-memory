@@ -74,7 +74,8 @@ internal static class SetupCommands
         {
             var options = CliContext.Options(parse, io);
             var root = ConfigLocations.FindProject(io.WorkingDirectory, options.ProjectDirectory, HostEnvironment.Current)?.RootDirectory ?? io.WorkingDirectory;
-            var checks = await Integrations.Doctor.RunAsync(options, root, CommandResolves, ct);
+            var checks = (await Integrations.Doctor.RunAsync(options, root, CommandResolves, ct)).ToList();
+            checks.Insert(0, await UpgradeCommand.DoctorCheckAsync(ct));
             foreach (var check in checks)
             {
                 await io.Out.WriteLineAsync($"{check.State.ToString().ToLowerInvariant(),-7} {check.Name}: {check.Detail}");

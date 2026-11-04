@@ -67,7 +67,7 @@ public sealed class CommandLineTests : IDisposable
         var exitCode = BrainCommandLine.Create(new CliIo(output, TextWriter.Null, false, _project)).Parse(["--version"]).Invoke(new InvocationConfiguration { Output = output });
 
         Assert.Equal(0, exitCode);
-        Assert.StartsWith("0.1.0", output.ToString(), StringComparison.Ordinal);
+        Assert.StartsWith("0.0.0-dev", output.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

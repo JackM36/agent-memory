@@ -27,6 +27,7 @@ get: brain get <ref>[#section] — content is reference material from the listed
 
 - [Concepts](#concepts)
 - [Install](#install)
+  - [Upgrading](#upgrading)
 - [Setup](#setup)
   - [1. A single project (local only)](#1-a-single-project-local-only)
   - [2. A library for all your projects (local)](#2-a-library-for-all-your-projects-local)
@@ -42,6 +43,7 @@ get: brain get <ref>[#section] — content is reference material from the listed
 - [Files and formats](#files-and-formats)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
+  - [Contributing and releases](#contributing-and-releases)
 
 ## Concepts
 
@@ -113,24 +115,67 @@ So you choose per collection whether agents add knowledge freely or you review e
 
 ## Install
 
-`brain` is a single self-contained executable with no runtime to install. Releases for Windows, macOS
-and Linux (x64 and arm64) are built by `.github/workflows/release.yml` when a `v*` tag is pushed, and
-the server image is published to GitHub Container Registry at the same time.
+`brain` is a single self-contained executable with no runtime to install. Every release has builds for
+Windows, macOS and Linux, on x64 and arm64.
 
-Until a release exists, build it yourself. You need the [.NET 10 SDK](https://dotnet.microsoft.com/download).
+**Windows** (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/JackM36/agent-memory/main/install.ps1 | iex
+```
+
+**macOS and Linux:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JackM36/agent-memory/main/install.sh | sh
+```
+
+The script:
+- downloads the latest release for your OS and CPU;
+- verifies it against the release's `SHA256SUMS`;
+- installs it to `%LOCALAPPDATA%\agent-brain\bin` or `~/.agent-brain/bin`;
+- adds that folder to your `PATH`. Open a new terminal afterwards.
+
+No admin rights are needed. Environment variables adjust it:
+- `AGENT_BRAIN_VERSION=0.3.1` installs a specific version;
+- `AGENT_BRAIN_INSTALL_DIR` changes the folder;
+- `AGENT_BRAIN_NO_MODIFY_PATH=1` leaves `PATH` alone.
+
+```bash
+brain --version
+```
+
+### Upgrading
+
+```bash
+brain upgrade
+```
+
+`brain upgrade` installs the latest release in place, checksum-verified, in the same folder. That way
+every MCP registration and hook that calls `brain` keeps working. Its options:
+- `--check`: only report whether a newer release exists;
+- `--version 0.3.1`: install a specific version (it can also downgrade);
+- `--force`: reinstall even when up to date.
+
+Running the install script again does the same. `brain doctor` reports when a newer release exists; set
+`AGENT_BRAIN_NO_UPDATE_CHECK=1` to skip that check.
+
+After an upgrade, restart agent sessions so they start the new MCP server. If a release changes the
+instructions `brain init` installs, `brain doctor` says so in each project, and running `brain init`
+again refreshes them in place.
+
+### Building from source
+
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 
 ```bash
 dotnet publish src/AgentBrain.Cli -c Release -r win-x64 -o ~/tools/brain
 ```
 
 Use the runtime identifier for your platform: `win-x64`, `win-arm64`, `osx-arm64`, `osx-x64`,
-`linux-x64` or `linux-arm64`. Then put the output folder on your `PATH`. Native AOT on Windows needs the
-Visual Studio C++ build tools, with `C:\Program Files (x86)\Microsoft Visual Studio\Installer` on
-`PATH`. Check the install with:
-
-```bash
-brain --version
-```
+`linux-x64` or `linux-arm64`. Then put the output folder on your `PATH`. Local builds report version
+`0.0.0-dev`. Native AOT on Windows needs the Visual Studio C++ build tools, with
+`C:\Program Files (x86)\Microsoft Visual Studio\Installer` on `PATH`.
 
 ## Setup
 
@@ -252,7 +297,12 @@ git clone <this repository> agent-brain && cd agent-brain/deploy
 cp .env.example .env
 ```
 
-Edit `.env` and set `AGENT_BRAIN_DOMAIN`. Then initialise:
+Edit `.env`:
+- set `AGENT_BRAIN_DOMAIN`;
+- optionally pin `AGENT_BRAIN_VERSION` to a release, for example `0.4.0`. The default, `latest`, follows
+  every release.
+
+Then initialise:
 
 ```bash
 docker compose run --rm brain-server init --collection library --title "Library"
@@ -484,6 +534,7 @@ through for one write, after a person has confirmed a false positive.
 | `brain index status\|reindex\|verify\|reset` | Inspect or rebuild the search index |
 | `brain config show [--origin]` / `brain config validate` | Effective configuration |
 | `brain mcp` | Run the MCP server on stdin/stdout |
+| `brain upgrade [--check] [--version x] [--force]` | Upgrade brain in place to the latest release (checksum-verified) |
 | `brain hook stop --host claude\|codex` | The Stop-hook entry point that `init` installs |
 
 ### Exit codes
@@ -606,6 +657,22 @@ person its own key; revocation takes effect immediately. `init` creates:
 | `tls` | Kestrel terminates HTTPS with your certificate |
 | `local` | Loopback only |
 
+**Upgrading the server.** Every release publishes `ghcr.io/<owner>/agent-brain-server:<version>`, and
+`latest` is moved to it once verified. Set `AGENT_BRAIN_VERSION` in `deploy/.env`, or keep `latest`,
+take a backup, then pull and restart:
+
+```bash
+docker compose exec brain-server /app/brain-server backup
+```
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Database upgrades run automatically at start-up, after an automatic backup. To roll back, set the previous
+version and run the same commands. Without Docker, download the `brain-server-<platform>` archive from the
+release.
+
 Guides: [docs/deployment.md](docs/deployment.md) (Docker Compose, DigitalOcean, keys, backups, upgrades,
 systemd) and [docs/http-api.md](docs/http-api.md) (routes, scopes, errors).
 
@@ -678,6 +745,10 @@ Add `"readOnly": true` for packaged knowledge. Full reference: [docs/schema.md](
 | An interrupted multi-file publication | `brain batch status`, then `resume` or `discard` |
 | The index looks wrong | `brain index verify`, or `brain index reset` (always safe) |
 | `brain doctor` says the integration is outdated | Run `brain init` again (it updates in place) |
+| `brain doctor` says a newer version is available | `brain upgrade`, then restart agent sessions |
+| `brain upgrade` says this is not an installed brain | It replaces the running executable, so it does not work from `dotnet run` or a development build. Use the install script. |
+| `brain upgrade` cannot reach GitHub, or hits a rate limit | Try again later, or set `AGENT_BRAIN_GITHUB_TOKEN` (sent only to the GitHub API) |
+| `brain` is not found after installing | Open a new terminal. The installer added its folder to `PATH` for new sessions. |
 
 **Migrating from the old `.agent-memory` scaffold.** The importer goes through the same validation and
 secret scan as any other write. Rules are listed, not imported, so you can move them into your instruction
@@ -703,8 +774,48 @@ dotnet test --solution AgentBrain.slnx
 dotnet run --project eval/AgentBrain.Evaluation -c Release
 ```
 
-The evaluation measures retrieval quality; see [eval/README.md](eval/README.md). CI builds and tests on
-Windows, macOS and Linux, runs the evaluation gate and smoke-tests the AOT binary.
+The evaluation measures retrieval quality; see [eval/README.md](eval/README.md).
+
+### Contributing and releases
+
+Every change reaches `main` through a pull request, which is squash-merged, so the **PR title becomes
+the commit** that decides the release. Titles follow
+[Conventional Commits](https://www.conventionalcommits.org/):
+
+| PR title | Release |
+|---|---|
+| `feat: …` | Minor (0.3.0 → 0.4.0) |
+| `fix: …`, `perf: …`, `build: …`, `revert: …` | Patch (0.3.0 → 0.3.1) |
+| `feat!: …`, or `BREAKING CHANGE:` in the body | Major |
+| `docs: …`, `chore: …`, `ci: …`, `refactor: …`, `style: …`, `test: …` | No release |
+
+A scope is optional: `fix(mcp): …`.
+
+**PR Validation** (`.github/workflows/ci.yml`) runs on each pull request:
+- checks the title;
+- builds and tests on Windows, macOS and Linux;
+- runs the retrieval evaluation gate;
+- tests the release configuration;
+- smoke-tests the AOT binary.
+
+**Release** (`.github/workflows/release.yml`) runs on every merge to `main`:
+
+1. **Plan:** `semantic-release --dry-run` works out the next version from the titles since the last tag.
+   If nothing releasable merged, the workflow stops.
+2. **Verify:** build, tests and the evaluation gate.
+3. **Build:** `brain` (Native AOT) and `brain-server` for six platforms, stamped with the version, plus
+   the multi-arch server image `ghcr.io/<owner>/agent-brain-server:<version>`.
+4. **Publish:** semantic-release creates the tag and the GitHub release with generated notes, the
+   archives and `SHA256SUMS`. The workflow checks the tag, then tags the verified image `latest`.
+
+Release tooling lives in `package.json`, `.releaserc.json` and `scripts/semantic-release/`
+(`npm ci && npm test`). One-time repository settings:
+
+- Protect `main`: require a pull request and the PR Validation checks.
+- Allow squash merging only, with the default commit message set to the pull request title.
+- Under Actions, give workflows read and write permissions.
+- The first release starts at 1.0.0 unless a `v0.x.y` tag already exists on `main`. To start at 0.x,
+  tag once by hand: `git tag v0.1.0 <commit> && git push origin v0.1.0`.
 
 | Topic | Document |
 |---|---|

@@ -1,16 +1,71 @@
-name: ci
+name: PR Validation
 
+# Every change reaches main through a pull request. The squash-merge commit takes the PR title, and the
+# release workflow reads those titles to decide the next version, so the title format is checked here.
 on:
-  push:
-    branches: [main]
   pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review, edited]
 
 permissions:
   contents: read
 
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
+  pr-title:
+    name: PR title (conventional)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        shell: bash
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          pr_metadata="${PR_TITLE}"$'\n'"${PR_BODY:-}"
+          normalized_metadata="${pr_metadata,,}"
+          skip_pattern='\[(skip ci|ci skip|no ci|skip actions|actions skip|skip-ci)\]|skip-checks:[[:space:]]*true'
+          if [[ "${normalized_metadata}" =~ ${skip_pattern} ]]; then
+            echo "::error::PR titles and bodies must not skip the release workflow."
+            exit 1
+          fi
+
+          pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([A-Za-z0-9._/-]+\))?(!)?: .+'
+          if [[ "${PR_TITLE}" =~ ${pattern} ]]; then
+            echo "PR title is conventional: ${PR_TITLE}"
+            exit 0
+          fi
+
+          echo "::error::PR title must follow Conventional Commits, for example 'feat: add brain update' or 'fix(mcp): route saves by kind'."
+          exit 1
+
+  release-tooling:
+    name: Release tooling
+    needs: pr-title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      - name: Test release configuration
+        run: npm test
+
   build-test:
-    name: build and test (${{ matrix.os }})
+    name: Build and test (${{ matrix.os }})
+    needs: pr-title
     strategy:
       fail-fast: false
       matrix:
@@ -23,9 +78,9 @@ jobs:
             rid: linux-x64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
@@ -40,14 +95,8 @@ jobs:
         run: dotnet run --project eval/AgentBrain.Evaluation -c Release --no-build -- --phase 5 --min-pass 0.85 --max-irrelevant 0
 
       - name: Publish brain (Native AOT)
-        run: dotnet publish src/AgentBrain.Cli -c Release -r ${{ matrix.rid }} -o artifacts/brain-${{ matrix.rid }}
+        run: dotnet publish src/AgentBrain.Cli -c Release -r ${{ matrix.rid }} -o artifacts/brain
 
       - name: Smoke test the AOT binary
         shell: bash
-        run: ./artifacts/brain-${{ matrix.rid }}/brain --version
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: brain-${{ matrix.rid }}
-          path: artifacts/brain-${{ matrix.rid }}
-          retention-days: 7
+        run: ./artifacts/brain/brain --version

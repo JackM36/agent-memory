@@ -12,6 +12,9 @@
     <RootNamespace>$(MSBuildProjectName)</RootNamespace>
     <Authors>Jack Hadjicosti</Authors>
     <Product>Agent Brain</Product>
-    <Version>0.1.0</Version>
+    <!-- Local builds are 0.0.0-dev; the release workflow passes -p:Version from semantic-release. -->
+    <Version>0.0.0-dev</Version>
+    <!-- Where brain update looks for releases (owner/repo on GitHub). CI passes the building repository. -->
+    <AgentBrainRepository>JackM36/agent-memory</AgentBrainRepository>
   </PropertyGroup>
 </Project>

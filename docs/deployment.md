@@ -156,14 +156,25 @@ To restore: stop the server, replace `/data/db/brain.db` with the backup, delete
 
 ## Upgrades
 
+Every release publishes `ghcr.io/<owner>/agent-brain-server:<version>` and moves `latest` to it once
+verified. The GitHub release page lists what changed. To upgrade, set the version in `deploy/.env`
+(`AGENT_BRAIN_VERSION=0.4.0`), or leave it at `latest`, then:
+
 ```bash
-cd agent-brain && git pull && cd deploy
-docker compose pull      # or: docker compose build
-docker compose up -d
+docker compose exec brain-server /app/brain-server backup
 ```
 
-Database schema upgrades run automatically at start-up. Take a backup first. The server refuses to open
-a database written by a newer version.
+```bash
+docker compose pull && docker compose up -d
+```
+
+Pinning a version makes upgrades deliberate and rollbacks easy: set the previous version and run the same
+commands. If you change files under `deploy/` (Compose file, Caddyfile), also `git pull` this repository on
+the host.
+
+Database schema upgrades run automatically at start-up, after an automatic backup to `backups/`. The
+server refuses to open a database written by a newer version, so rolling back across a schema change means
+restoring the backup taken before the upgrade.
 
 ## systemd (without Docker)
 

@@ -8,3 +8,5 @@ tests/
 _SPECS/
 docs/
 deploy/.env
+node_modules/
+dist/

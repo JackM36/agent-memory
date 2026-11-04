@@ -91,4 +91,5 @@ Batch file:
 | `brain collection create <id> [--path dir] [--title …] [--tech t] [--review] [--knowledge] [--project]` | Create a general-knowledge collection folder and register it (user file by default; `--review` makes saves proposals; `--knowledge` sets `writes.knowledge`) |
 | `brain collection add <path> [--access read\|review\|maintain] [--knowledge] [--project]` | Register an existing collection, e.g. another project's memory for cross-project search (read-only by default) |
 | `brain mcp` | MCP server on stdin/stdout |
+| `brain upgrade [--check] [--version x] [--force]` | Upgrade brain in place to the latest GitHub release, checksum-verified; `--check` only reports |
 | `brain hook stop --host claude\|codex` | Stop-hook entry point (installed by `init`) |

@@ -37,6 +37,7 @@ internal static class BrainCommandLine
         root.Subcommands.Add(SetupCommands.Doctor(io));
         root.Subcommands.Add(SetupCommands.Hook(io));
         root.Subcommands.Add(McpCommand.Create(io));
+        root.Subcommands.Add(UpgradeCommand.Create(io));
         return root;
     }
 }
