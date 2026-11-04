@@ -19,8 +19,9 @@ public sealed class DependencyRulesTests
         [P + "Infrastructure.Sqlite"] = new([P + "Application"], ["Microsoft.Data.Sqlite"]),
         [P + "Infrastructure.Local"] = new([P + "Application"], []),
         [P + "Infrastructure.Http"] = new([P + "Application", P + "Contracts"], []),
+        [P + "Infrastructure.Jev"] = new([P + "Application"], []),
         [P + "Composition"] = new(
-            [P + "Application", P + "Contracts", P + "Infrastructure.Local", P + "Infrastructure.Markdown", P + "Infrastructure.Sqlite", P + "Infrastructure.Http"],
+            [P + "Application", P + "Contracts", P + "Infrastructure.Local", P + "Infrastructure.Markdown", P + "Infrastructure.Sqlite", P + "Infrastructure.Http", P + "Infrastructure.Jev"],
             []),
         [P + "Mcp"] = new([P + "Composition", P + "Contracts", P + "Application"], ["ModelContextProtocol", "Microsoft.Extensions.Hosting"]),
         [P + "Integrations"] = new([P + "Composition", P + "Contracts", P + "Application"], ["Tomlyn"]),

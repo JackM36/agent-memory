@@ -4,6 +4,7 @@ using AgentBrain.Application.Abstractions.Indexing;
 using AgentBrain.Application.Abstractions.Providers;
 using AgentBrain.Application.Abstractions.Storage;
 using AgentBrain.Application.Common;
+using AgentBrain.Application.Decisions;
 using AgentBrain.Application.Retrieval.QueryAnalysis;
 using AgentBrain.Application.Retrieval.Ranking;
 using AgentBrain.Domain.Entries;
@@ -29,6 +30,7 @@ public sealed class LocalKnowledgeProvider : IKnowledgeProvider
     private readonly IReadOnlyList<AliasGroup> _aliases;
     private readonly string? _projectId;
     private readonly string? _displayRoot;
+    private readonly IRelevanceJudge _judge;
 
     public LocalKnowledgeProvider(
         ISearchIndex index,
@@ -37,7 +39,8 @@ public sealed class LocalKnowledgeProvider : IKnowledgeProvider
         IReadOnlyList<AliasGroup> aliases,
         string? projectId,
         string? displayRoot,
-        string sourceId = Id)
+        string sourceId = Id,
+        IRelevanceJudge? judge = null)
     {
         ArgumentNullException.ThrowIfNull(collections);
         _index = index;
@@ -45,6 +48,7 @@ public sealed class LocalKnowledgeProvider : IKnowledgeProvider
         _collections = collections.ToDictionary(c => c.Info.Id);
         _projectId = projectId;
         _displayRoot = displayRoot;
+        _judge = judge ?? HeuristicRelevanceJudge.Instance;
         SourceId = sourceId;
 
         // Plan §5.7 scopes collection aliases to their collection's entries. Phase 2 applies them to the
@@ -67,8 +71,8 @@ public sealed class LocalKnowledgeProvider : IKnowledgeProvider
 
         var query = new CandidateQuery(terms, request.Context, [.. _collections.Keys], request.Filters.Kinds ?? [], request.Filters, request.Include, request.CandidateLimit);
         var set = await _index.FindCandidatesAsync(query, cancellationToken);
-        var (results, blocking) = Ranker.Rank(set, terms, request.Context, request.Relaxation, request.Explain);
-        return new ProviderSearchResult(ToRanked(results), ToRanked(blocking), IndexStale: false);
+        var judged = await _judge.JudgeAsync(new RelevanceInput(request.Query, set, terms, request.Context, request.Relaxation, request.Explain), cancellationToken);
+        return new ProviderSearchResult(ToRanked(judged.Results), ToRanked(judged.Blocking), IndexStale: false, judged.Notes.Count == 0 ? null : judged.Notes);
     }
 
     public async ValueTask<Result<Page<RankedEntry>>> ListAsync(ListRequest request, CancellationToken cancellationToken)

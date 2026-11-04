@@ -1,4 +1,5 @@
 using AgentBrain.Application.Abstractions.Support;
+using AgentBrain.Application.Decisions;
 using AgentBrain.Application.Retrieval;
 using AgentBrain.Domain.Access;
 using AgentBrain.Domain.Entries;
@@ -10,7 +11,7 @@ namespace AgentBrain.Application.Configuration;
 public sealed record ProjectSettings(string Id, string RootDirectory, IReadOnlyList<string> Technologies, IReadOnlyDictionary<string, string> Packages);
 
 /// <summary>A registered local collection. <see cref="Capabilities"/> are as registered; storage may cap them further.</summary>
-public sealed record RegisteredCollection(CollectionId Id, string Path, Capability Capabilities, bool ImmediatePublish);
+public sealed record RegisteredCollection(CollectionId Id, string Path, Capability Capabilities, bool ImmediatePublish, bool AllowExternalDecisions = false);
 
 /// <summary>What project context may be forwarded to a remote connection (all false by default).</summary>
 public sealed record ForwardPolicy(bool Project, bool Technologies, bool Files, bool Symbols)
@@ -50,7 +51,12 @@ public sealed record EffectiveConfiguration(
     IReadOnlyList<AliasGroup> Aliases,
     string? RuntimeDirectory,
     string? ProposalsDirectory,
-    IReadOnlyDictionary<string, ConfigOrigin> Origins);
+    IReadOnlyDictionary<string, ConfigOrigin> Origins,
+    DecisionSettings? DecisionConfig = null)
+{
+    /// <summary>Which implementation each decision port uses; everything is a heuristic when nothing is configured.</summary>
+    public DecisionSettings Decisions => DecisionConfig ?? Application.Decisions.DecisionSettings.Off;
+}
 
 public sealed record ConfigDiagnostic(IssueSeverity Severity, string Path, string Message, ConfigOrigin? Origin)
 {

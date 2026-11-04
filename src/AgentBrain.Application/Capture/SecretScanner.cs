@@ -28,6 +28,15 @@ public static partial class SecretScanner
 
     public static IReadOnlyList<string> RuleIds { get; } = [.. Rules.Select(r => r.Rule)];
 
+    /// <summary>True when free text matches any secret rule.</summary>
+    public static bool ContainsSecret(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var findings = new List<SecretFinding>();
+        Check(findings, "text", text, null);
+        return findings.Count > 0;
+    }
+
     public static IReadOnlyList<SecretFinding> Scan(EntryMetadata metadata, string body, IReadOnlyCollection<string>? allowedRules = null)
     {
         ArgumentNullException.ThrowIfNull(metadata);

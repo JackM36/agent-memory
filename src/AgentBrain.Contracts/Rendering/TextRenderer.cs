@@ -64,6 +64,11 @@ public sealed class TextRenderer : IResponseRenderer
         }
 
         text.Append('\n');
+        if (outcome.Notes is { Count: > 0 } notes)
+        {
+            text.Append(CultureInfo.InvariantCulture, $"note: {string.Join("; ", notes)}\n");
+        }
+
         foreach (var blocking in response.Blocking)
         {
             text.Append(CultureInfo.InvariantCulture, $"BLOCKING {blocking.Entry.Ref} — {blocking.Entry.Summary}\n");

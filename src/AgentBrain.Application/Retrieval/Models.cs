@@ -100,7 +100,8 @@ public sealed record SourceStatus(string SourceId, SourceState State, string? De
 public sealed record ProviderSearchResult(
     IReadOnlyList<RankedEntry> Results,
     IReadOnlyList<RankedEntry> Blocking,
-    bool IndexStale);
+    bool IndexStale,
+    IReadOnlyList<string>? Notes = null);
 
 public sealed record ListRequest(
     SearchFilters Filters,
@@ -144,7 +145,8 @@ public sealed record SearchOutcome(
     IReadOnlyList<RankedEntry> Results,
     IReadOnlyList<RankedEntry> Blocking,
     IReadOnlyList<SourceStatus> Sources,
-    bool IndexStale)
+    bool IndexStale,
+    IReadOnlyList<string>? Notes = null)
 {
     public bool IsPartial => Sources.Any(s => s.State != SourceState.Ok);
 }

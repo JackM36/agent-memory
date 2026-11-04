@@ -65,7 +65,8 @@ public static class DtoMapper
             [.. response.Blocking.Select(ToDto)],
             [.. response.Results.Select(ToDto)],
             new OmittedDto(response.OmittedForBudget, response.BlockingOmitted),
-            new BudgetDto(response.ByteLimit, response.UsedBytes, EstimateTokens(response.UsedBytes)));
+            new BudgetDto(response.ByteLimit, response.UsedBytes, EstimateTokens(response.UsedBytes)),
+            response.Outcome.Notes);
     }
 
     public static ListResponseDto ToDto(ListResponse response)

@@ -112,7 +112,7 @@ internal static class MaintenanceCommands
 
         foreach (var collection in c.Collections)
         {
-            Line($"collections.{collection.Id}", $"{collection.Path} {Join(Capabilities.ToNames(collection.Capabilities))}{(collection.ImmediatePublish ? " immediatePublish" : "")}");
+            Line($"collections.{collection.Id}", $"{collection.Path} {Join(Capabilities.ToNames(collection.Capabilities))}{(collection.ImmediatePublish ? " immediatePublish" : "")}{(collection.AllowExternalDecisions ? " allowExternalDecisions" : "")}");
         }
 
         foreach (var connection in c.Connections)
@@ -131,6 +131,16 @@ internal static class MaintenanceCommands
         Line("search.candidatesPerSource", Number(c.Search.CandidatesPerSource));
         Line("search.kinds", Join(c.Search.Kinds.Select(k => WireNames.Kinds.Name(k))));
         Line("search.log", c.Search.Log ? "true" : "false");
+        var d = c.Decisions;
+        Line("decisions.relevance", AgentBrain.Application.Decisions.DecisionModes.Names.Name(d.Relevance));
+        Line("decisions.classifier", AgentBrain.Application.Decisions.DecisionModes.Names.Name(d.Classifier));
+        Line("decisions.duplicates", AgentBrain.Application.Decisions.DecisionModes.Names.Name(d.Duplicates));
+        Line("decisions.captureGate", d.CaptureGate ? "jev" : "off");
+        if (d.UsesModel)
+        {
+            Line("decisions.jev", $"{d.Jev.Model} key from ${d.Jev.Credential.EnvironmentVariable} timeout {d.Jev.Timeout.TotalMilliseconds}ms concurrency {d.Jev.MaxConcurrency} pool {d.Jev.RelevancePool}");
+        }
+
         Line("get.maxBytes", Number(c.Get.MaxBytes));
         Line("get.batchTargets", Number(c.Get.BatchTargets));
         Line("get.batchBytes", Number(c.Get.BatchBytes));

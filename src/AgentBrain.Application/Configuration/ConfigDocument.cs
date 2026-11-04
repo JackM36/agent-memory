@@ -25,6 +25,8 @@ public sealed record ConfigDocument
 
     public GetSection? Get { get; init; }
 
+    public DecisionsSection? Decisions { get; init; }
+
     public IReadOnlyDictionary<string, IReadOnlyList<string>>? Aliases { get; init; }
 
     public string? RuntimeDir { get; init; }
@@ -44,7 +46,8 @@ public sealed record CollectionRegistration(
     string? Path = null,
     IReadOnlyList<string>? Capabilities = null,
     bool? ImmediatePublish = null,
-    bool? Enabled = null);
+    bool? Enabled = null,
+    bool? AllowExternalDecisions = null);
 
 public sealed record ConnectionDefinition(
     string? Url = null,
@@ -68,3 +71,20 @@ public sealed record SearchSection(
     bool? Log = null);
 
 public sealed record GetSection(int? MaxBytes = null, int? BatchTargets = null, int? BatchBytes = null);
+
+/// <summary>The <c>decisions</c> section (ADR 0010). Every value is optional; ports default to the heuristic.</summary>
+public sealed record DecisionsSection(
+    JevSection? Jev = null,
+    string? Relevance = null,
+    string? Classifier = null,
+    string? Duplicates = null,
+    string? CaptureGate = null);
+
+public sealed record JevSection(
+    string? ApiKeyEnv = null,
+    string? Model = null,
+    int? TimeoutMs = null,
+    int? MaxConcurrency = null,
+    int? MaxCallsPerOperation = null,
+    double? MinConfidence = null,
+    int? RelevancePool = null);

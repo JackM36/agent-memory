@@ -1,6 +1,7 @@
 using AgentBrain.Application.Abstractions.Support;
 using AgentBrain.Application.Common;
 using AgentBrain.Application.Configuration;
+using AgentBrain.Application.Decisions;
 using AgentBrain.Application.Retrieval;
 using AgentBrain.Application.Retrieval.Budgeting;
 using AgentBrain.Application.Retrieval.QueryAnalysis;
@@ -73,7 +74,7 @@ public sealed class SearchOperation(EffectiveConfiguration configuration, Retrie
             input.Relaxation ?? settings.Relaxation,
             new ResponseLimits(maxResults, input.MaxBytes ?? settings.MaxBytes, input.MaxTokens ?? settings.MaxTokens),
             input.Include,
-            Math.Max(settings.CandidatesPerSource, maxResults * 2),
+            CandidateLimit(settings, maxResults),
             input.Explain);
 
         var stale = await freshness.EnsureFreshAsync(cancellationToken);
@@ -98,6 +99,14 @@ public sealed class SearchOperation(EffectiveConfiguration configuration, Retrie
         }
 
         return response;
+    }
+
+    /// <summary>A model-backed relevance judge gets a wide pool: it can only judge what candidate generation returns (ADR 0010).</summary>
+    private int CandidateLimit(SearchSettings settings, int maxResults)
+    {
+        var limit = Math.Max(settings.CandidatesPerSource, maxResults * 2);
+        var decisions = configuration.Decisions;
+        return decisions.Relevance == DecisionMode.Heuristic ? limit : Math.Max(limit, decisions.Jev.RelevancePool);
     }
 
     private QueryContext BuildContext(SearchInput input)

@@ -93,3 +93,13 @@ synthetic collections (default 100, 1,000 and 10,000 entries).
 overlap on their key terms. They exist to measure the vocabulary-mismatch risk honestly; Phase 2
 calibration decides whether stemming, identifier splitting or aliases close them, or whether they
 remain documented misses.
+
+## Comparing decision implementations
+
+`--relevance heuristic|jev|hybrid` runs the cases with that relevance judge (ADR 0010); `--compare heuristic,jev,hybrid`
+runs each in turn and prints pass rate, recall, irrelevant results, latency, and for model runs the calls, input tokens and
+estimated cost. A `jev` or `hybrid` run needs `TYPESAFE_API_KEY`; without it that row is skipped, never filled with
+heuristic numbers. The corpus is fixture data, so the runner marks every corpus collection `allowExternalDecisions` for a
+model run. Nothing in this repository has been measured against the live service yet: the adoption rule in ADR 0010
+(a model-backed port is recommended only if it beats the heuristic by a margin that justifies its latency and cost,
+with no new irrelevant results and no monotonicity violations) is still to be applied with a real key.

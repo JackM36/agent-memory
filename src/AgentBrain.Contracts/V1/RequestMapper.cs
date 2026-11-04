@@ -307,8 +307,8 @@ public static class RequestMapper
         }
 
         Revision? revision = Revision.TryParse(dto.Rev, out var r) ? r : null;
-        var similar = dto.Similar.Where(s => EntryRef.TryParse(s.Ref, out _)).Select(s => new SimilarEntry(EntryRef.Parse(s.Ref), s.Title, s.Summary)).ToList();
-        return new WriteResult(target, revision, similar);
+        var similar = dto.Similar.Where(s => EntryRef.TryParse(s.Ref, out _)).Select(s => new SimilarEntry(EntryRef.Parse(s.Ref), s.Title, s.Summary, Enum.TryParse<AgentBrain.Application.Decisions.DuplicateVerdict>(s.Verdict, true, out var verdict) ? verdict : null, s.Confidence)).ToList();
+        return new WriteResult(target, revision, similar, dto.Notes is { Count: > 0 } ? dto.Notes : null);
     }
 
     public static Result<ProposalView> ToProposalView(ProposalDto dto, string source)

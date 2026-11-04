@@ -53,6 +53,7 @@ public sealed class RetrievalCoordinator
         var outcomes = await Task.WhenAll(calls);
 
         var statuses = new List<SourceStatus>();
+        var notes = new List<string>();
         var results = new List<RankedEntry>();
         var blocking = new List<RankedEntry>();
         foreach (var (provider, result, state, detail) in outcomes)
@@ -69,9 +70,10 @@ public sealed class RetrievalCoordinator
             results.AddRange(result.Results);
             blocking.AddRange(result.Blocking);
             indexStale |= result.IndexStale;
+            notes.AddRange(result.Notes ?? []);
         }
 
-        return new SearchOutcome(Merge(results), Merge(blocking), statuses, indexStale);
+        return new SearchOutcome(Merge(results), Merge(blocking), statuses, indexStale, notes.Count == 0 ? null : [.. notes.Distinct(StringComparer.Ordinal)]);
     }
 
     /// <summary>Interleaves by source rank; ties go to the closer applicability class, then identity.</summary>

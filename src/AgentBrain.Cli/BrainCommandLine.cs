@@ -33,6 +33,7 @@ internal static class BrainCommandLine
 
         root.Subcommands.Add(ConnectionCommands.Create(io));
         root.Subcommands.Add(CollectionCommands.Create(io));
+        root.Subcommands.Add(DecisionsCommands.Create(io));
         root.Subcommands.Add(SetupCommands.Init(io));
         root.Subcommands.Add(SetupCommands.Doctor(io));
         root.Subcommands.Add(SetupCommands.Hook(io));

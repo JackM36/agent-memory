@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using AgentBrain.Application.Decisions;
 using AgentBrain.Application.Retrieval;
 using AgentBrain.Composition;
 using AgentBrain.Contracts.Rendering;
@@ -32,7 +33,7 @@ internal sealed record MonotonicityViolation(string CaseId, IReadOnlyList<string
 /// Runs every Phase 2 case against the corpus through the real runtime (configuration, Markdown,
 /// SQLite index, ranking, budgeting, compact rendering). Each named context becomes a temporary project.
 /// </summary>
-internal sealed class EvaluationRunner(string evalRoot, IndexTokenizer tokenizer, int phase)
+internal sealed class EvaluationRunner(string evalRoot, IndexTokenizer tokenizer, int phase, string relevance = "heuristic", DecisionMeter? meter = null, IDecisionModel? decisionModel = null)
 {
     private static readonly string[] CorpusCollections = ["general.engineering", "unity.kb", "web.kb", "space-game.memory", "web-shop.memory"];
 
@@ -89,16 +90,27 @@ internal sealed class EvaluationRunner(string evalRoot, IndexTokenizer tokenizer
         json.Append("{ \"schema\": 1, \"project\": { \"id\": \"").Append(context.Project).Append("\", \"technologies\": [")
             .Append(string.Join(", ", context.Technologies.Select(t => $"\"{t}\""))).Append("], \"packages\": {")
             .Append(string.Join(", ", context.Packages.Select(p => $"\"{p.Key}\": \"{p.Value}\""))).Append("} }, \"collections\": {");
-        json.Append(string.Join(", ", CorpusCollections.Select(c => $"\"{c}\": {{ \"path\": \"{Path.Combine(evalRoot, "corpus", c).Replace('\\', '/')}\" }}")));
-        json.Append("} }");
+        var allow = relevance == "heuristic" ? "" : ", \"allowExternalDecisions\": true";
+        json.Append(string.Join(", ", CorpusCollections.Select(c => $"\"{c}\": {{ \"path\": \"{Path.Combine(evalRoot, "corpus", c).Replace('\\', '/')}\"{allow} }}")));
+        json.Append('}');
+        if (relevance != "heuristic")
+        {
+            json.Append(", \"decisions\": { \"relevance\": \"").Append(relevance).Append("\" }");
+        }
+
+        json.Append(" }");
         await File.WriteAllTextAsync(Path.Combine(configDirectory, "config.json"), json.ToString(), cancellationToken);
 
         var userDirectory = Directory.CreateDirectory(Path.Combine(workspace, "user")).FullName;
-        var environment = new HostEnvironment(name => name == ConfigLocations.ConfigDirVariable ? userDirectory : null, OperatingSystem.IsWindows(), workspace);
+        // The decision key is the one variable passed through from the real environment; everything else stays isolated.
+        var environment = new HostEnvironment(
+            name => name == ConfigLocations.ConfigDirVariable ? userDirectory : name == DecisionDefaults.ApiKeyEnv ? Environment.GetEnvironmentVariable(name) : null,
+            OperatingSystem.IsWindows(),
+            workspace);
         var additional = extraSources
             .Select(s => (s, (IReadOnlyList<string>)[.. Directory.EnumerateDirectories(Path.Combine(evalRoot, s)).Order(StringComparer.Ordinal)]))
             .ToList();
-        var opened = await BrainRuntime.OpenAsync(new RuntimeOptions(projectRoot) { Environment = environment, Tokenizer = tokenizer, AdditionalSources = additional }, cancellationToken);
+        var opened = await BrainRuntime.OpenAsync(new RuntimeOptions(projectRoot) { Environment = environment, Tokenizer = tokenizer, AdditionalSources = additional, DecisionMeter = meter, DecisionModel = decisionModel }, cancellationToken);
         return opened.IsSuccess ? opened.Value : throw new InvalidOperationException(opened.Error.ToString());
     }
 

@@ -4,7 +4,7 @@ using System.Text.Json;
 using AgentBrain.Evaluation;
 using AgentBrain.Infrastructure.Sqlite;
 
-// brain-eval [--tokenizer porter|unicode61] [--phase N] [--out path] [--verbose]
+// brain-eval [--tokenizer porter|unicode61] [--phase N] [--out path] [--verbose] [--relevance heuristic|jev|hybrid] [--compare heuristic,jev,hybrid]
 // Runs the evaluation cases (eval/cases) against the corpus (eval/corpus) and prints metrics.
 Console.OutputEncoding = new UTF8Encoding(false);
 if (args is ["scan", .. var sizes])
@@ -18,6 +18,8 @@ string? output = null;
 var verbose = false;
 double? minPass = null;
 int? maxIrrelevant = null;
+var relevance = "heuristic";
+string[]? compare = null;
 for (var i = 0; i < args.Length; i++)
 {
     switch (args[i])
@@ -37,6 +39,12 @@ for (var i = 0; i < args.Length; i++)
         case "--min-pass":
             minPass = double.Parse(args[++i], CultureInfo.InvariantCulture);
             break;
+        case "--relevance":
+            relevance = args[++i].ToLowerInvariant();
+            break;
+        case "--compare":
+            compare = [.. args[++i].ToLowerInvariant().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+            break;
         case "--max-irrelevant":
             maxIrrelevant = int.Parse(args[++i], CultureInfo.InvariantCulture);
             break;
@@ -47,7 +55,18 @@ for (var i = 0; i < args.Length; i++)
 }
 
 var evalRoot = FindEvalRoot();
-var (results, violations) = await new EvaluationRunner(evalRoot, tokenizer, phase).RunAsync(CancellationToken.None);
+if (compare is not null)
+{
+    return await Comparison.RunAsync(evalRoot, tokenizer, phase, compare);
+}
+
+if (relevance is not ("heuristic" or "jev" or "hybrid"))
+{
+    await Console.Error.WriteLineAsync("--relevance must be heuristic, jev or hybrid");
+    return 2;
+}
+
+var (results, violations) = await new EvaluationRunner(evalRoot, tokenizer, phase, relevance).RunAsync(CancellationToken.None);
 
 var passed = results.Count(r => r.Passed);
 var relevantExpected = results.Sum(r => r.RelevantExpected);

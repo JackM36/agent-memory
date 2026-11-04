@@ -60,7 +60,8 @@ public sealed record SearchResponseDto(
     IReadOnlyList<EntrySummaryDto> Blocking,
     IReadOnlyList<EntrySummaryDto> Results,
     OmittedDto Omitted,
-    BudgetDto Budget);
+    BudgetDto Budget,
+    IReadOnlyList<string>? Notes = null);
 
 public sealed record ListResponseDto(
     int Protocol,

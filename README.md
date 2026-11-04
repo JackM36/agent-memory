@@ -457,6 +457,9 @@ Merge rules:
 | `search.kinds` | Kinds searched by default: knowledge, memory, uncertainty |
 | `search.log` | Opt-in local query log for calibration |
 | `get.maxBytes` / `batchTargets` / `batchBytes` | Fetch limits: 24 KB per entry, 10 entries, 48 KB per batch |
+| `collections.<id>.allowExternalDecisions` | Let this collection's titles, summaries and tags be sent to the decision model (`false` by default, see [Decisions](docs/configuration.md#decisions-heuristic-or-model-backed)) |
+| `decisions.relevance` / `classifier` / `duplicates` / `captureGate` | Which implementation answers each judgement: the built-in heuristic (default) or a Jev model. Nothing is sent anywhere unless you set one. |
+| `decisions.jev.apiKeyEnv` / `model` / `timeoutMs` | The environment variable holding the TypeSafe key (never the key), a pinned model ID, and the per-call deadline |
 
 Full details and the JSON schemas: [docs/configuration.md](docs/configuration.md), [docs/schema/](docs/schema/).
 
@@ -524,6 +527,10 @@ through for one write, after a person has confirmed a false positive.
 | `brain collection add <path>` | Register an existing collection. `--access read\|review\|maintain` (default read), `--knowledge`, `--project`. |
 | `brain connection add <name> --url … --credential-env VAR` | Register a server. Options: `--collections a,b`, `--forward …`, `--timeout-ms`, `--project`. |
 | `brain connection test <name>` | Authenticate and list the collections the key can read, with capabilities |
+| `brain decisions status` | Show which implementation each decision port uses, whether the key variable is set, and which collections may be sent to the model |
+| `brain decisions classify <kind> --title … --summary …` | Ask the classifier what an entry is. It advises only; your kind and destination win. |
+| `brain decisions gate "<text>"` | Ask the capture gate whether something is worth remembering |
+| `brain decisions allow\|deny <collection> [--project]` | Allow or stop sending a registered collection's text to the decision model |
 
 ### Setup and maintenance
 
@@ -626,9 +633,17 @@ copies differ), and an unreachable source makes the result `partial` instead of 
 are secret-scanned and checked against the collection's rules. Server collections apply the same checks
 on the server.
 
+**Decisions.** The judgements in the pipeline (admission and ranking, duplicate checks, kind classification,
+capture gating) are ports with a built-in heuristic, which is the default and needs no network. Each can
+instead use a Jev decision model from TypeSafe AI, or blend it with the heuristic. Filtering, the byte budget,
+authorization and secret scanning never depend on a model. A timeout or a missing key falls back to the
+heuristic and adds a `note:` line. Only collections marked `allowExternalDecisions` are ever sent, and entry
+bodies are not sent for relevance. See [ADR 0010](docs/decisions/0010-pluggable-decision-providers.md).
+
 More: [docs/architecture.md](docs/architecture.md), [docs/operations.md](docs/operations.md),
 [ADR 0006](docs/decisions/0006-local-retrieval.md) (retrieval calibration),
-[ADR 0008](docs/decisions/0008-knowledge-routing-and-remote-writes.md) (knowledge routing).
+[ADR 0008](docs/decisions/0008-knowledge-routing-and-remote-writes.md) (knowledge routing),
+[ADR 0010](docs/decisions/0010-pluggable-decision-providers.md) (heuristic or Jev decisions).
 
 ## Server reference
 

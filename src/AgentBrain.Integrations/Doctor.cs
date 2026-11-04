@@ -50,7 +50,7 @@ public static class Doctor
         }
 
         using var runtime = opened.Value;
-        foreach (var warning in runtime.Diagnostics.Where(d => d.Severity == IssueSeverity.Warning))
+        foreach (var warning in runtime.Diagnostics.Where(d => d.Severity == IssueSeverity.Warning && d.Path != "decisions"))
         {
             checks.Add(new Check("collections", CheckState.Warning, $"{warning.Path}: {warning.Message}"));
         }
@@ -73,8 +73,23 @@ public static class Doctor
             ? new Check("batches", CheckState.Warning, $"{batches.Count} interrupted publication(s); run brain batch status")
             : new Check("batches", CheckState.Ok, "none interrupted"));
 
+        checks.Add(DecisionCheck(runtime.Decisions.Status()));
         checks.AddRange(Integrations(projectRoot, commandResolves));
         return checks;
+    }
+
+    /// <summary>Heuristics need nothing. A model-backed port needs a key, a pinned model and at least one collection that allows it (ADR 0010).</summary>
+    private static Check DecisionCheck(Application.Operations.Decisions.DecisionStatus status)
+    {
+        var used = status.Ports.Where(p => p.UsesModel).Select(p => $"{p.Port}={p.Mode}").ToList();
+        if (used.Count == 0)
+        {
+            return new Check("decisions", CheckState.Ok, "all heuristic; no model is used");
+        }
+
+        return status.Problems.Count > 0
+            ? new Check("decisions", CheckState.Warning, $"{string.Join(", ", used)}: {string.Join(" ", status.Problems)}")
+            : new Check("decisions", CheckState.Ok, $"{string.Join(", ", used)}; {status.Model}, key set, may send {string.Join(", ", status.AllowedCollections)}");
     }
 
     private static IEnumerable<Check> Integrations(string root, Func<string, bool> commandResolves)

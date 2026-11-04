@@ -6,6 +6,7 @@
     <Project Path="src/AgentBrain.Contracts/AgentBrain.Contracts.csproj" />
     <Project Path="src/AgentBrain.Domain/AgentBrain.Domain.csproj" />
     <Project Path="src/AgentBrain.Infrastructure.Http/AgentBrain.Infrastructure.Http.csproj" />
+    <Project Path="src/AgentBrain.Infrastructure.Jev/AgentBrain.Infrastructure.Jev.csproj" />
     <Project Path="src/AgentBrain.Infrastructure.Local/AgentBrain.Infrastructure.Local.csproj" />
     <Project Path="src/AgentBrain.Infrastructure.Markdown/AgentBrain.Infrastructure.Markdown.csproj" />
     <Project Path="src/AgentBrain.Infrastructure.Sqlite/AgentBrain.Infrastructure.Sqlite.csproj" />
@@ -19,6 +20,7 @@
     <Project Path="tests/AgentBrain.Cli.Tests/AgentBrain.Cli.Tests.csproj" />
     <Project Path="tests/AgentBrain.Contracts.Tests/AgentBrain.Contracts.Tests.csproj" />
     <Project Path="tests/AgentBrain.Domain.Tests/AgentBrain.Domain.Tests.csproj" />
+    <Project Path="tests/AgentBrain.Infrastructure.Jev.Tests/AgentBrain.Infrastructure.Jev.Tests.csproj" />
     <Project Path="tests/AgentBrain.Infrastructure.Local.Tests/AgentBrain.Infrastructure.Local.Tests.csproj" />
     <Project Path="tests/AgentBrain.Integrations.Tests/AgentBrain.Integrations.Tests.csproj" />
     <Project Path="tests/AgentBrain.Infrastructure.Markdown.Tests/AgentBrain.Infrastructure.Markdown.Tests.csproj" />

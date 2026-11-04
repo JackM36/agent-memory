@@ -1,8 +1,8 @@
 namespace AgentBrain.Contracts.V1;
 
-public sealed record SimilarDto(string Ref, string Title, string Summary);
+public sealed record SimilarDto(string Ref, string Title, string Summary, string? Verdict = null, double? Confidence = null);
 
-public sealed record WriteResponseDto(int Protocol, string Ref, string? Rev, IReadOnlyList<SimilarDto> Similar);
+public sealed record WriteResponseDto(int Protocol, string Ref, string? Rev, IReadOnlyList<SimilarDto> Similar, IReadOnlyList<string>? Notes = null);
 
 public sealed record SimilarResponseDto(int Protocol, IReadOnlyList<SimilarDto> Similar);
 

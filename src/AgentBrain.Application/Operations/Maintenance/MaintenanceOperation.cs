@@ -2,6 +2,7 @@ using AgentBrain.Application.Authorization;
 using AgentBrain.Application.Capture;
 using AgentBrain.Application.Common;
 using AgentBrain.Application.Configuration;
+using AgentBrain.Application.Decisions;
 using AgentBrain.Application.Retrieval;
 using AgentBrain.Application.Writing;
 using AgentBrain.Domain.Access;
@@ -12,7 +13,7 @@ using AgentBrain.Domain.Revisions;
 namespace AgentBrain.Application.Operations.Maintenance;
 
 /// <summary>Outcome of a direct write: the entry, its new revision (none after delete) and likely duplicates to review.</summary>
-public sealed record WriteResult(EntryRef Ref, Revision? Revision, IReadOnlyList<SimilarEntry> Similar);
+public sealed record WriteResult(EntryRef Ref, Revision? Revision, IReadOnlyList<SimilarEntry> Similar, IReadOnlyList<string>? Notes = null);
 
 /// <summary>
 /// Direct maintenance of designated project-memory collections (spec §10.1): create, update, archive,
@@ -25,7 +26,8 @@ public sealed class MaintenanceOperation(
     RetrievalCoordinator coordinator,
     ChangePreparer preparer,
     SimilarEntryFinder similar,
-    IndexFreshness freshness)
+    IndexFreshness freshness,
+    DecisionServices? decisions = null)
 {
     public async ValueTask<Result<WriteResult>> CreateAsync(CallerContext caller, CollectionId? collectionId, NewEntry entry, IReadOnlyCollection<string> allowedSecretRules, CancellationToken cancellationToken)
     {
@@ -37,9 +39,28 @@ public sealed class MaintenanceOperation(
         }
 
         await freshness.EnsureFreshAsync(cancellationToken);
-        var duplicates = await similar.FindAsync(collection.Value.Info.Id, entry.Title, entry.Summary, entry.Tags, null, cancellationToken);
+        var id = collection.Value.Info.Id;
+
+        // Validate and secret-scan first: nothing is looked up or sent to a decision model for an entry that cannot be written.
         var change = await preparer.CreateAsync(collection.Value, entry, allowedSecretRules, cancellationToken);
-        return change.IsSuccess ? await WriteAsync(collection.Value, change.Value, duplicates, cancellationToken) : change.Error;
+        if (!change.IsSuccess)
+        {
+            return change.Error;
+        }
+
+        var found = await similar.FindAsync(id, entry.Title, entry.Summary, entry.Tags, null, cancellationToken);
+        var services = decisions ?? DecisionServices.Heuristic;
+        var judged = await services.Duplicates.JudgeAsync(new DuplicateInput(id, entry.Title, entry.Summary, entry.Tags, found), cancellationToken);
+        var notes = new List<string>(judged.Notes);
+        var classified = await services.Classifier.ClassifyAsync(
+            new ClassificationInput(id, entry.Kind, entry.Title, entry.Summary, entry.Tags, Excerpt(entry.Body)), cancellationToken);
+        notes.AddRange(classified.Notes);
+        if (classified.Suggestion?.Disagreement(entry.Kind, services.Settings.Jev.MinConfidence) is { } disagreement)
+        {
+            notes.Add(disagreement);
+        }
+
+        return await WriteAsync(collection.Value, change.Value, judged.Similar, notes, cancellationToken);
     }
 
     public async ValueTask<Result<WriteResult>> UpdateAsync(CallerContext caller, EntryRef target, Revision baseRevision, EntryPatch patch, IReadOnlyCollection<string> allowedSecretRules, CancellationToken cancellationToken)
@@ -61,7 +82,7 @@ public sealed class MaintenanceOperation(
         }
 
         var change = await preparer.UpdateAsync(collection.Value, target.Entry, baseRevision, patch, allowedSecretRules, cancellationToken);
-        return change.IsSuccess ? await WriteAsync(collection.Value, change.Value, [], cancellationToken) : change.Error;
+        return change.IsSuccess ? await WriteAsync(collection.Value, change.Value, [], [], cancellationToken) : change.Error;
     }
 
     public ValueTask<Result<WriteResult>> ArchiveAsync(CallerContext caller, EntryRef target, Revision baseRevision, CancellationToken cancellationToken) =>
@@ -93,7 +114,7 @@ public sealed class MaintenanceOperation(
         }
 
         var change = await ChangePreparer.DeleteAsync(collection.Value, target.Entry, baseRevision, cancellationToken);
-        return change.IsSuccess ? await WriteAsync(collection.Value, change.Value, [], cancellationToken) : change.Error;
+        return change.IsSuccess ? await WriteAsync(collection.Value, change.Value, [], [], cancellationToken) : change.Error;
     }
 
     /// <summary>The likely-duplicate check on its own (<c>brain similar</c>).</summary>
@@ -126,7 +147,7 @@ public sealed class MaintenanceOperation(
         return allowed.IsSuccess ? collection : allowed.Error;
     }
 
-    private async ValueTask<Result<WriteResult>> WriteAsync(WritableCollection collection, PreparedChange change, IReadOnlyList<SimilarEntry> duplicates, CancellationToken cancellationToken)
+    private async ValueTask<Result<WriteResult>> WriteAsync(WritableCollection collection, PreparedChange change, IReadOnlyList<SimilarEntry> duplicates, List<string> notes, CancellationToken cancellationToken)
     {
         var written = await ChangeApplier.ApplyAsync(collection, change, cancellationToken);
         if (!written.IsSuccess)
@@ -135,8 +156,10 @@ public sealed class MaintenanceOperation(
         }
 
         await freshness.EnsureFreshAsync(cancellationToken);
-        return new WriteResult(change.Target, written.Value, duplicates);
+        return new WriteResult(change.Target, written.Value, duplicates, notes.Count == 0 ? null : notes);
     }
+
+    private static string? Excerpt(string body) => string.IsNullOrWhiteSpace(body) ? null : body.Length <= 600 ? body : body[..600];
 
     private async ValueTask<bool> ExistsAsync(EntryRef target, CancellationToken cancellationToken)
     {

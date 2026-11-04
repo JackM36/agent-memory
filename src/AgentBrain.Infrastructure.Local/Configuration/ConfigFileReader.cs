@@ -52,7 +52,7 @@ public static class ConfigFileReader
         Project = f.Project is { } p ? new ProjectSection(p.Id, p.Technologies, p.Packages) : null,
         Collections = f.Collections?.ToDictionary(
             kv => kv.Key,
-            kv => new CollectionRegistration(kv.Value.Path, kv.Value.Capabilities, kv.Value.ImmediatePublish, kv.Value.Enabled),
+            kv => new CollectionRegistration(kv.Value.Path, kv.Value.Capabilities, kv.Value.ImmediatePublish, kv.Value.Enabled, kv.Value.AllowExternalDecisions),
             StringComparer.Ordinal),
         Connections = f.Connections?.ToDictionary(
             kv => kv.Key,
@@ -68,6 +68,11 @@ public static class ConfigFileReader
         SourcePreference = f.SourcePreference,
         Search = f.Search is { } s ? new SearchSection(s.Relaxation, s.MaxResults, s.MaxTokens, s.MaxBytes, s.CandidatesPerSource, s.Kinds, s.Log) : null,
         Get = f.Get is { } g ? new GetSection(g.MaxBytes, g.BatchTargets, g.BatchBytes) : null,
+        Decisions = f.Decisions is { } dc
+            ? new DecisionsSection(
+                dc.Jev is { } j ? new JevSection(j.ApiKeyEnv, j.Model, j.TimeoutMs, j.MaxConcurrency, j.MaxCallsPerOperation, j.MinConfidence, j.RelevancePool) : null,
+                dc.Relevance, dc.Classifier, dc.Duplicates, dc.CaptureGate)
+            : null,
         Aliases = f.Aliases?.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<string>)kv.Value, StringComparer.Ordinal),
         RuntimeDir = f.RuntimeDir,
         Proposals = f.Proposals,

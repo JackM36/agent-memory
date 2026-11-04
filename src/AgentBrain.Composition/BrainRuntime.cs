@@ -10,6 +10,10 @@ using AgentBrain.Application.Operations.Publishing;
 using AgentBrain.Application.Writing;
 using AgentBrain.Application.Common;
 using AgentBrain.Application.Configuration;
+using AgentBrain.Application.Decisions;
+using AgentBrain.Application.Operations.Decisions;
+using AgentBrain.Infrastructure.Jev;
+using AgentBrain.Infrastructure.Local.Security;
 using AgentBrain.Application.Indexing;
 using AgentBrain.Application.Operations;
 using AgentBrain.Application.Operations.Content;
@@ -48,6 +52,15 @@ public sealed record RuntimeOptions(string WorkingDirectory)
     /// the evaluation runner to exercise federation (fusion, duplicates, revision conflicts) without a server.
     /// </summary>
     public IReadOnlyList<(string SourceId, IReadOnlyList<string> Roots)> AdditionalSources { get; init; } = [];
+
+    /// <summary>Counts what the decision model was asked and what it cost (evaluation and status).</summary>
+    public DecisionMeter? DecisionMeter { get; init; }
+
+    /// <summary>Replaces the network transport of the decision model (tests).</summary>
+    public HttpMessageHandler? DecisionHandler { get; init; }
+
+    /// <summary>Replaces the decision model itself (tests).</summary>
+    public IDecisionModel? DecisionModel { get; init; }
 }
 
 /// <summary>
@@ -73,8 +86,10 @@ public sealed class BrainRuntime : IDisposable
         Get = new GetOperation(parts.Configuration, parts.Coordinator, freshness);
         Relations = new RelationsOperation(parts.Coordinator, freshness);
         Index = new IndexOperation(parts.Index, parts.Synchronizer);
+        DecisionServices = parts.Decisions;
+        Decisions = new DecisionsOperation(parts.Configuration, parts.Decisions, parts.Credentials);
         Maintenance = new MaintenanceOperation(parts.Configuration, parts.Catalog, parts.Coordinator, preparer,
-            new SimilarEntryFinder(parts.Index, parts.Configuration.Aliases), freshness);
+            new SimilarEntryFinder(parts.Index, parts.Configuration.Aliases), freshness, parts.Decisions);
         Proposals = new ProposalOperation(parts.Catalog, preparer, new FileProposalStore(parts.ProposalsDirectory), parts.Audit, freshness, time);
         Publishing = new PublishOperation(parts.Catalog, preparer, new FileBatchJournal(Path.Combine(parts.StateDirectory, "batches")), parts.Audit, freshness, time);
         Catalog = parts.Catalog;
@@ -96,6 +111,11 @@ public sealed class BrainRuntime : IDisposable
     public RelationsOperation Relations { get; }
 
     public IndexOperation Index { get; }
+
+    /// <summary>Which implementation each decision port uses, plus the classifier and capture gate on their own.</summary>
+    public DecisionsOperation Decisions { get; }
+
+    public DecisionServices DecisionServices { get; }
 
     public MaintenanceOperation Maintenance { get; }
 
@@ -179,6 +199,13 @@ public sealed class BrainRuntime : IDisposable
             scanners.Add(collection);
         }
 
+        var policy = new ExternalDecisionPolicy(configuration.Collections.Where(c => c.AllowExternalDecisions).Select(c => c.Id).ToHashSet());
+        var credentials = new EnvironmentCredentialResolver(options.Environment);
+        var decisions = JevDecisionServices.Create(
+            configuration.Decisions, credentials.Resolve(configuration.Decisions.Jev.Credential), policy, stateDirectory,
+            options.DecisionHandler, options.DecisionModel, options.DecisionMeter);
+        diagnostics.AddRange(decisions.Problems.Select(p => Warning("decisions", p)));
+
         SqliteSearchIndex? index = null;
         IndexSynchronizer? synchronizer = null;
         var sources = new List<(Application.Abstractions.Providers.IKnowledgeProvider, TimeSpan?)>();
@@ -186,7 +213,7 @@ public sealed class BrainRuntime : IDisposable
         {
             index = SqliteSearchIndex.Open(options.IndexPath ?? Path.Combine(dataDirectory, "cache", "index.db"), options.Tokenizer);
             synchronizer = new IndexSynchronizer(index, scanners, locks);
-            var provider = new LocalKnowledgeProvider(index, analyzer, collections, configuration.Aliases, configuration.Project?.Id, configuration.Project?.RootDirectory);
+            var provider = new LocalKnowledgeProvider(index, analyzer, collections, configuration.Aliases, configuration.Project?.Id, configuration.Project?.RootDirectory, judge: decisions.Relevance);
             sources.Add((provider, null));
         }
 
@@ -199,14 +226,14 @@ public sealed class BrainRuntime : IDisposable
             resources.Add(extraIndex);
             await new IndexSynchronizer(extraIndex, extra, locks).SynchronizeAsync(SyncMode.Rebuild, IndexSynchronizer.MaintenanceLockWait, cancellationToken);
             var extraCollections = extra.Select(c => new LocalCollection(c, new CollectionInfo(c.Collection.Id, c.Collection.Title, Capability.Read, true, sourceId))).ToList();
-            sources.Add((new LocalKnowledgeProvider(extraIndex, analyzer, extraCollections, configuration.Aliases, configuration.Project?.Id, null, sourceId), null));
+            sources.Add((new LocalKnowledgeProvider(extraIndex, analyzer, extraCollections, configuration.Aliases, configuration.Project?.Id, null, sourceId, decisions.Relevance), null));
         }
 
         IQueryLog? queryLog = configuration.Search.Log ? new JsonlQueryLog(Path.Combine(stateDirectory, "query-log.jsonl")) : null;
         var proposals = configuration.ProposalsDirectory ?? Path.Combine(ConfigLocations.UserDirectory(options.Environment), "proposals");
         return new BrainRuntime(new RuntimeParts(
             configuration, diagnostics, index, new RetrievalCoordinator(sources, configuration.SourcePreference), synchronizer, queryLog,
-            new CollectionCatalog(writable), new JsonlAuditLog(Path.Combine(stateDirectory, "audit")), proposals, stateDirectory, resources));
+            new CollectionCatalog(writable), new JsonlAuditLog(Path.Combine(stateDirectory, "audit")), proposals, stateDirectory, resources, decisions, credentials));
     }
 
     private sealed record RuntimeParts(
@@ -220,7 +247,9 @@ public sealed class BrainRuntime : IDisposable
         IAuditLog Audit,
         string ProposalsDirectory,
         string StateDirectory,
-        IReadOnlyList<IDisposable> Resources);
+        IReadOnlyList<IDisposable> Resources,
+        DecisionServices Decisions,
+        ICredentialResolver Credentials);
 
     /// <summary>Registers <c>--collection-root</c> directories as read-only collections in the per-call document, keyed by their own ID.</summary>
     private static ConfigDocument? WithExtraRoots(RuntimeOptions options, out List<string> errors)

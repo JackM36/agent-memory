@@ -29,6 +29,8 @@ internal sealed class ConfigFile
 
     public GetFile? Get { get; set; }
 
+    public DecisionsFile? Decisions { get; set; }
+
     public Dictionary<string, List<string>>? Aliases { get; set; }
 
     public string? RuntimeDir { get; set; }
@@ -56,6 +58,8 @@ internal sealed class CollectionFile
     public bool? ImmediatePublish { get; set; }
 
     public bool? Enabled { get; set; }
+
+    public bool? AllowExternalDecisions { get; set; }
 }
 
 internal sealed class ConnectionFile
@@ -115,6 +119,36 @@ internal sealed class GetFile
     public int? BatchTargets { get; set; }
 
     public int? BatchBytes { get; set; }
+}
+
+internal sealed class DecisionsFile
+{
+    public JevFile? Jev { get; set; }
+
+    public string? Relevance { get; set; }
+
+    public string? Classifier { get; set; }
+
+    public string? Duplicates { get; set; }
+
+    public string? CaptureGate { get; set; }
+}
+
+internal sealed class JevFile
+{
+    public string? ApiKeyEnv { get; set; }
+
+    public string? Model { get; set; }
+
+    public int? TimeoutMs { get; set; }
+
+    public int? MaxConcurrency { get; set; }
+
+    public int? MaxCallsPerOperation { get; set; }
+
+    public double? MinConfidence { get; set; }
+
+    public int? RelevancePool { get; set; }
 }
 
 [JsonSourceGenerationOptions(

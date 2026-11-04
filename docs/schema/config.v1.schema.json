@@ -42,6 +42,7 @@
             "default": ["read"]
           },
           "immediatePublish": { "type": "boolean", "default": false },
+          "allowExternalDecisions": { "type": "boolean", "default": false, "description": "Allow this collection's entry text (titles, summaries, tags, excerpts) to be sent to the decision model. Without it the collection is judged by heuristics only." },
           "enabled": { "type": "boolean" }
         }
       }
@@ -114,6 +115,30 @@
         "maxBytes": { "type": "integer", "minimum": 1024, "maximum": 10000000, "default": 24576 },
         "batchTargets": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 },
         "batchBytes": { "type": "integer", "minimum": 1024, "maximum": 10000000, "default": 49152 }
+      }
+    },
+    "decisions": {
+      "type": "object",
+      "description": "Which implementation answers each judgement (ADR 0010). Every port defaults to its heuristic; no model is contacted unless a port says jev or hybrid.",
+      "additionalProperties": false,
+      "properties": {
+        "jev": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "apiKeyEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "default": "TYPESAFE_API_KEY", "description": "Name of the environment variable holding the key, never the key." },
+            "model": { "type": "string", "default": "jev-1.14.0", "description": "A versioned model ID. Aliases such as jev-latest move and are warned about." },
+            "timeoutMs": { "type": "integer", "minimum": 100, "maximum": 120000, "default": 1500 },
+            "maxConcurrency": { "type": "integer", "minimum": 1, "maximum": 64, "default": 12 },
+            "maxCallsPerOperation": { "type": "integer", "minimum": 1, "maximum": 2000, "default": 150 },
+            "minConfidence": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.6 },
+            "relevancePool": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100, "description": "Candidates the relevance judge may score per search; the candidate limit is raised to this." }
+          }
+        },
+        "relevance": { "enum": ["heuristic", "jev", "hybrid"], "default": "heuristic" },
+        "classifier": { "enum": ["heuristic", "jev"], "default": "heuristic" },
+        "duplicates": { "enum": ["heuristic", "jev"], "default": "heuristic" },
+        "captureGate": { "enum": ["off", "jev"], "default": "off" }
       }
     },
     "aliases": {

@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using AgentBrain.Application.Abstractions.Support;
+using AgentBrain.Application.Decisions;
 using AgentBrain.Application.Retrieval;
 using AgentBrain.Domain.Access;
 using AgentBrain.Domain.Entries;
@@ -59,6 +60,7 @@ public static partial class ConfigLayering
             var project = ResolveProject();
             var search = ResolveSearch();
             var get = ResolveGet();
+            var decisions = ResolveDecisions();
             var aliases = ResolveAliases();
             var memoryWrite = ResolveMemoryWrite(collections);
             var knowledgeWrite = ResolveKnowledgeWrite(collections, connections);
@@ -68,7 +70,7 @@ public static partial class ConfigLayering
 
             var configuration = new EffectiveConfiguration(
                 project, collections, connections, memoryWrite, knowledgeWrite, sourcePreference, search, get, aliases,
-                runtimeDir, proposalsDir, _origins);
+                runtimeDir, proposalsDir, _origins, decisions);
             return new ConfigResolution(configuration, _diagnostics);
         }
 
@@ -194,7 +196,7 @@ public static partial class ConfigLayering
                     capabilities |= Capability.Read;
                 }
 
-                collections.Add(new RegisteredCollection(id, ResolvePath(layer, registration.Path), capabilities, registration.ImmediatePublish ?? false));
+                collections.Add(new RegisteredCollection(id, ResolvePath(layer, registration.Path), capabilities, registration.ImmediatePublish ?? false, registration.AllowExternalDecisions ?? false));
             }
 
             return [.. collections.OrderBy(c => c.Id.Value, StringComparer.Ordinal)];
@@ -300,6 +302,88 @@ public static partial class ConfigLayering
                 candidates,
                 kinds,
                 Pick("search.log", d => d.Search?.Log) ?? false);
+        }
+
+        private DecisionSettings ResolveDecisions()
+        {
+            var defaults = JevSettings.Default;
+            var env = Pick("decisions.jev.apiKeyEnv", d => d.Decisions?.Jev?.ApiKeyEnv) ?? DecisionDefaults.ApiKeyEnv;
+            if (!EnvironmentVariableName().IsMatch(env))
+            {
+                Fail("decisions.jev.apiKeyEnv", "'apiKeyEnv' is the name of the environment variable holding the key, not the key itself.", _origins.GetValueOrDefault("decisions.jev.apiKeyEnv"));
+                env = DecisionDefaults.ApiKeyEnv;
+            }
+
+            var model = Pick("decisions.jev.model", d => d.Decisions?.Jev?.Model) ?? defaults.Model;
+            if (string.IsNullOrWhiteSpace(model))
+            {
+                Fail("decisions.jev.model", "A model ID is required.", _origins.GetValueOrDefault("decisions.jev.model"));
+                model = DecisionDefaults.Model;
+            }
+
+            var timeout = PickOptionalInt("decisions.jev.timeoutMs", d => d.Decisions?.Jev?.TimeoutMs, DecisionDefaults.TimeoutRange) ?? DecisionDefaults.TimeoutMs;
+            var concurrency = PickOptionalInt("decisions.jev.maxConcurrency", d => d.Decisions?.Jev?.MaxConcurrency, DecisionDefaults.ConcurrencyRange) ?? DecisionDefaults.MaxConcurrency;
+            var calls = PickOptionalInt("decisions.jev.maxCallsPerOperation", d => d.Decisions?.Jev?.MaxCallsPerOperation, DecisionDefaults.CallsRange) ?? DecisionDefaults.MaxCallsPerOperation;
+            var pool = PickOptionalInt("decisions.jev.relevancePool", d => d.Decisions?.Jev?.RelevancePool, DecisionDefaults.PoolRange) ?? DecisionDefaults.RelevancePool;
+            var confidence = Pick("decisions.jev.minConfidence", d => d.Decisions?.Jev?.MinConfidence) ?? DecisionDefaults.MinConfidence;
+            if (confidence is < 0 or > 1)
+            {
+                Fail("decisions.jev.minConfidence", $"{confidence} is outside the accepted range 0–1.", _origins["decisions.jev.minConfidence"]);
+                confidence = DecisionDefaults.MinConfidence;
+            }
+
+            var jev = new JevSettings(new CredentialReference(env), model.Trim(), TimeSpan.FromMilliseconds(timeout), concurrency, calls, confidence, pool);
+            var relevance = PickMode("decisions.relevance", d => d.Decisions?.Relevance, allowHybrid: true, "heuristic, jev or hybrid");
+            var classifier = PickMode("decisions.classifier", d => d.Decisions?.Classifier, allowHybrid: false, "heuristic or jev");
+            var duplicates = PickMode("decisions.duplicates", d => d.Decisions?.Duplicates, allowHybrid: false, "heuristic or jev");
+            var gateText = Pick("decisions.captureGate", d => d.Decisions?.CaptureGate)?.Trim().ToLowerInvariant();
+            var gate = gateText switch
+            {
+                null or "off" => false,
+                "jev" => true,
+                _ => FailBool("decisions.captureGate", $"'{gateText}' is not off or jev."),
+            };
+
+            var settings = new DecisionSettings(relevance, classifier, duplicates, gate, jev);
+            if (settings.UsesModel && jev.IsAlias)
+            {
+                Warn("decisions.jev.model", $"'{jev.Model}' is an alias that moves to newer models; pin a version such as '{DecisionDefaults.Model}' so evaluation results stay comparable.", _origins.GetValueOrDefault("decisions.jev.model"));
+            }
+
+            return settings;
+        }
+
+        private DecisionMode PickMode(string path, Func<ConfigDocument, string?> select, bool allowHybrid, string expected)
+        {
+            var text = Pick(path, select)?.Trim().ToLowerInvariant();
+            if (text is null)
+            {
+                return DecisionMode.Heuristic;
+            }
+
+            if (DecisionModes.Names.TryParse(text, out var mode) && (allowHybrid || mode != DecisionMode.Hybrid))
+            {
+                return mode;
+            }
+
+            Fail(path, $"'{text}' is not {expected}.", _origins[path]);
+            return DecisionMode.Heuristic;
+        }
+
+        private bool FailBool(string path, string message)
+        {
+            Fail(path, message, _origins.GetValueOrDefault(path));
+            return false;
+        }
+
+        private int? PickOptionalInt(string path, Func<ConfigDocument, int?> select, (int Min, int Max) range)
+        {
+            if (Pick(path, select) is not { } value)
+            {
+                return null;
+            }
+
+            return InRange(path, value, range, _origins[path]) ? value : Math.Clamp(value, range.Min, range.Max);
         }
 
         private GetSettings ResolveGet() => new(

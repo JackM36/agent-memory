@@ -8,7 +8,7 @@ using AgentBrain.Domain.Identity;
 namespace AgentBrain.Application.Capture;
 
 /// <summary>An existing entry that may already cover what is about to be written.</summary>
-public sealed record SimilarEntry(EntryRef Ref, string Title, string Summary);
+public sealed record SimilarEntry(EntryRef Ref, string Title, string Summary, Decisions.DuplicateVerdict? Verdict = null, double? Confidence = null);
 
 /// <summary>
 /// Likely-duplicate check before writing (plan §8.3): broad-admission search over the target collection

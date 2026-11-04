@@ -144,7 +144,7 @@ internal static class CollectionCommands
         return ExitCodes.Success;
     }
 
-    private static (string File, string ConfigDirectory, bool IsProject)? Target(CliIo io, ParseResult parse, Option<bool> project)
+    internal static (string File, string ConfigDirectory, bool IsProject)? Target(CliIo io, ParseResult parse, Option<bool> project)
     {
         if (!parse.GetValue(project))
         {

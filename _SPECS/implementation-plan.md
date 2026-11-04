@@ -17,6 +17,7 @@ The product is named **Agent Brain**. The spec's "knowledge and memory tool" is 
 | 4 — Replace the legacy scaffold | Built; **dogfood gate skipped at the owner's request** | Legacy scaffold removed, README and docs rewritten; `tools/LegacyImport` kept until the owner confirms all projects are imported |
 | 5 — Remote host, federation, deployment | Built; exit gate open (live Droplet used from two projects); Docker image not built locally (no daemon) | [ADR 0007](../docs/decisions/0007-writes-remote-and-hardening.md), [deployment.md](../docs/deployment.md), [http-api.md](../docs/http-api.md) |
 | 6 — Hardening, packaging, documentation | Built; release workflow not yet run | Security tests, `.github/workflows/release.yml`, measurements in ADR 0007 |
+| Follow-up — pluggable decision providers (heuristic / Jev) | Proposed; nothing implemented | [ADR 0010](../docs/decisions/0010-pluggable-decision-providers.md) |
 | Follow-up — shared knowledge | Built | Knowledge routing (`writes.memory` / `writes.knowledge`), remote writes, collection commands, `promote`: [ADR 0008](../docs/decisions/0008-knowledge-routing-and-remote-writes.md) |
 
 Phases 3–6 were built in one pass without stopping at the gates ("finish all phases first before we test anything"). Owner testing is the next step.

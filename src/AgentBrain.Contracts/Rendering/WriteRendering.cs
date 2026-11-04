@@ -23,7 +23,7 @@ public static class WriteRendering
         if (json)
         {
             return JsonSerializer.Serialize(
-                new WriteResponseDto(ProtocolVersions.Protocol, result.Ref.ToString(), result.Revision?.Value, [.. result.Similar.Select(Similar)]),
+                new WriteResponseDto(ProtocolVersions.Protocol, result.Ref.ToString(), result.Revision?.Value, [.. result.Similar.Select(Similar)], result.Notes is { Count: > 0 } ? result.Notes : null),
                 ContractsJsonContext.Default.WriteResponseDto);
         }
 
@@ -39,8 +39,14 @@ public static class WriteRendering
             text.Append("similar existing entries — update one of these instead of keeping a duplicate:\n");
             foreach (var s in result.Similar)
             {
-                text.Append(CultureInfo.InvariantCulture, $"  {s.Ref} {s.Summary}\n");
+                var verdict = s.Verdict is { } v ? string.Create(CultureInfo.InvariantCulture, $" [{v.ToString().ToLowerInvariant()} {s.Confidence:0.00}]") : "";
+                text.Append(CultureInfo.InvariantCulture, $"  {s.Ref}{verdict} {s.Summary}\n");
             }
+        }
+
+        foreach (var note in result.Notes ?? [])
+        {
+            text.Append(CultureInfo.InvariantCulture, $"note: {note}\n");
         }
 
         return text.ToString();
@@ -182,7 +188,7 @@ public static class WriteRendering
         return text.ToString();
     }
 
-    private static SimilarDto Similar(SimilarEntry s) => new(s.Ref.ToString(), s.Title, s.Summary);
+    private static SimilarDto Similar(SimilarEntry s) => new(s.Ref.ToString(), s.Title, s.Summary, s.Verdict?.ToString().ToLowerInvariant(), s.Confidence);
 
     private static string Kind(ChangeKind kind) => kind.ToString().ToLowerInvariant();
 

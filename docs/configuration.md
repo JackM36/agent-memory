@@ -122,3 +122,51 @@ File paths outside the project are never sent.
 | `search.kinds` | knowledge, memory, uncertainty | any kinds |
 | `search.log` | false | opt-in local query log in `local/state/query-log.jsonl` |
 | `get.maxBytes` / `get.batchTargets` / `get.batchBytes` | 24576 / 10 / 49152 | |
+
+## Decisions (heuristic or model-backed)
+
+Search and writing make a few judgements: does a candidate answer the query, is a new entry a duplicate, what
+kind is it, is it worth remembering. Each is a *port* with a built-in heuristic (the default) and an optional
+model-backed implementation (Jev, from TypeSafe AI). Nothing contacts a model unless you ask for it. The design
+and its rules are in [ADR 0010](decisions/0010-pluggable-decision-providers.md).
+
+```json
+{
+  "decisions": {
+    "jev": { "apiKeyEnv": "TYPESAFE_API_KEY", "model": "jev-1.14.0", "timeoutMs": 1500 },
+    "relevance": "hybrid",
+    "classifier": "jev",
+    "duplicates": "jev",
+    "captureGate": "off"
+  },
+  "collections": {
+    "library": { "path": "~/agent-brain/library", "capabilities": ["read", "maintain"], "allowExternalDecisions": true }
+  }
+}
+```
+
+| Setting | Default | Values / range |
+|---|---|---|
+| `decisions.relevance` | `heuristic` | `heuristic`, `jev` (the model admits and ranks), `hybrid` (both, blended) |
+| `decisions.classifier` | `heuristic` | `heuristic` (the agent's kind stands), `jev` (adds a note when it disagrees) |
+| `decisions.duplicates` | `heuristic` | `heuristic` (lexical list), `jev` (adds a verdict per similar entry, drops unrelated ones) |
+| `decisions.captureGate` | `off` | `off`, `jev` (used by `brain decisions gate`) |
+| `decisions.jev.apiKeyEnv` | `TYPESAFE_API_KEY` | the name of an environment variable; never the key |
+| `decisions.jev.model` | `jev-1.14.0` | a versioned ID; `jev-latest` and `jev-preview` move and are warned about |
+| `decisions.jev.timeoutMs` | 1500 | 100–120000, the whole deadline of one call including retries |
+| `decisions.jev.maxConcurrency` | 12 | 1–64 |
+| `decisions.jev.maxCallsPerOperation` | 150 | 1–2000; candidates beyond it keep the heuristic verdict |
+| `decisions.jev.minConfidence` | 0.6 | 0–1; below it a classification or verdict is not reported |
+| `decisions.jev.relevancePool` | 100 | 1–500; with a model-backed relevance port the candidate limit is raised to this |
+| `collections.<id>.allowExternalDecisions` | false | whether this collection's titles, summaries, tags and body excerpts may be sent |
+
+- **Privacy.** Text from a collection without `allowExternalDecisions` is only ever judged by heuristics, even when a
+  port says `jev`. Bodies are never sent to the relevance judge. Set the flag with
+  `brain decisions allow <collection>` (and `deny`); it edits the file that registers the collection.
+- **Fallback.** A timeout, `429`/`529`, a missing key or an invalid answer falls back to the heuristic and adds a
+  `note:` line to the response. Filtering, budgeting and authorization never depend on the model.
+- **Explicit choices win.** The classifier only advises; the kind and destination you give are used.
+- **Check it.** `brain decisions status` shows each port's mode, whether the key variable is set, which collections
+  may be sent, and what would keep a model from being used. To compare implementations on the evaluation corpus run
+  `dotnet run --project eval/AgentBrain.Evaluation -c Release -- --compare heuristic,jev,hybrid`; a model run is skipped
+  (and says so) when the key is not set.

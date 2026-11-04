@@ -10,6 +10,9 @@ namespace AgentBrain.Application.Retrieval.Ranking;
 /// <summary>A candidate after admission and scoring.</summary>
 public sealed record ScoredCandidate(IndexCandidate Candidate, ApplicabilityClass Applicability, double Score, string? Explanation);
 
+/// <summary>A scored candidate with the heuristic's admission verdict (for a blocking uncertainty: whether it qualifies to block).</summary>
+public sealed record EvaluatedCandidate(ScoredCandidate Scored, bool Admitted, bool IsBlocking);
+
 /// <summary>
 /// Plan §6.1 stages 4–7: extract features, admit, score, and pick blocking uncertainties. Admission
 /// uses query-relative evidence (concept coverage weighted by rarity, plus structural matches), never
@@ -18,6 +21,23 @@ public sealed record ScoredCandidate(IndexCandidate Candidate, ApplicabilityClas
 public static class Ranker
 {
     public static (IReadOnlyList<ScoredCandidate> Results, IReadOnlyList<ScoredCandidate> Blocking) Rank(
+        CandidateSet set, QueryTerms terms, QueryContext context, Relaxation relaxation, bool explain)
+    {
+        var evaluated = Evaluate(set, terms, context, relaxation, explain);
+        var results = evaluated.Where(e => e.Admitted && !e.IsBlocking).Select(e => e.Scored).ToList();
+        var blocking = evaluated.Where(e => e.Admitted && e.IsBlocking).Select(e => e.Scored).ToList();
+        return (Order(results), Order(blocking).Take(RankingProfileV1.MaxBlocking).ToList());
+    }
+
+    /// <summary>Candidates in the order search shows them: score, then applicability, then identity.</summary>
+    public static IReadOnlyList<ScoredCandidate> OrderForDisplay(IEnumerable<ScoredCandidate> candidates) => Order([.. candidates]);
+
+    /// <summary>
+    /// Extracts features and scores every candidate and says whether the heuristic admits it, without ordering
+    /// or cutting. <see cref="Rank"/> is built on this; a model-backed judge uses it to see the candidates the
+    /// heuristic rejected as well (ADR 0010). For a blocking uncertainty, "admitted" means it qualifies to block.
+    /// </summary>
+    public static IReadOnlyList<EvaluatedCandidate> Evaluate(
         CandidateSet set, QueryTerms terms, QueryContext context, Relaxation relaxation, bool explain)
     {
         ArgumentNullException.ThrowIfNull(set);
@@ -31,8 +51,7 @@ public static class Ranker
         var unknownWeight = known.Count > 0 ? known.Average() : 0;
         var weights = set.ConceptDocumentFrequency.Select(df => df == 0 ? unknownWeight : Math.Log(1 + (set.TotalEntries / (df + 1.0)))).ToList();
         var lexicalCount = Math.Max(1, set.Candidates.Count(c => c.LexicalRank is not null));
-        var results = new List<ScoredCandidate>();
-        var blocking = new List<ScoredCandidate>();
+        var evaluated = new List<EvaluatedCandidate>(set.Candidates.Count);
 
         foreach (var candidate in set.Candidates)
         {
@@ -44,21 +63,15 @@ public static class Ranker
             if (candidate.Entry.Metadata.IsBlockingUncertainty)
             {
                 var structural = f.FileMatch || f.Symbol != MatchStrength.None;
-                if (f.Applicability != ApplicabilityClass.OtherProject && (structural || f.Coverage >= RankingProfileV1.BlockingCoverageFloor))
-                {
-                    blocking.Add(scored);
-                }
-
+                var qualifies = f.Applicability != ApplicabilityClass.OtherProject && (structural || f.Coverage >= RankingProfileV1.BlockingCoverageFloor);
+                evaluated.Add(new EvaluatedCandidate(scored, qualifies, true));
                 continue;
             }
 
-            if (Admitted(f, relaxation))
-            {
-                results.Add(scored);
-            }
+            evaluated.Add(new EvaluatedCandidate(scored, Admitted(f, relaxation), false));
         }
 
-        return (Order(results), Order(blocking).Take(RankingProfileV1.MaxBlocking).ToList());
+        return evaluated;
     }
 
     private static List<ScoredCandidate> Order(List<ScoredCandidate> candidates) =>
